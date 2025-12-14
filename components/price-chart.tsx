@@ -34,6 +34,11 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
   }, [forecastDays, onForecastChange])
 
   useEffect(() => {
+    // Safety check: Ensure data exists before processing
+    if (!data || typeof data.currentPrice !== 'number' || typeof data.predictedPrice !== 'number') {
+        return;
+    }
+
     const basePrice = data.currentPrice
     const historicalData = Array.from({ length: 30 }, (_, i) => {
       const variance = Math.random() * 0.08 - 0.04
@@ -45,9 +50,10 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
 
       return {
         date: date.toISOString().split("T")[0],
-        price: Math.round(price * 100) / 100,
+        // Safety: Ensure Price is Number
+        price: Number((Math.round(price * 100) / 100).toFixed(2)),
         isPrediction: false,
-        sma50: Math.round(sma50 * 100) / 100,
+        sma50: Number((Math.round(sma50 * 100) / 100).toFixed(2)),
       }
     })
 
@@ -67,14 +73,18 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
 
       return {
         date: date.toISOString().split("T")[0],
-        price: Math.round(price * 100) / 100,
+        price: Number((Math.round(price * 100) / 100).toFixed(2)),
         isPrediction: true,
-        range: [Math.round(lower_price * 100) / 100, Math.round(upper_price * 100) / 100] as [number, number],
+        // Safety: Ensure Range is Array of Numbers
+        range: [
+            Number((Math.round(lower_price * 100) / 100).toFixed(2)), 
+            Number((Math.round(upper_price * 100) / 100).toFixed(2))
+        ] as [number, number],
       }
     })
 
     setChartData([...historicalData, ...predictedData])
-  }, [forecastDays, data.currentPrice, data.predictedPrice])
+  }, [forecastDays, data]) // Dependency fixed to 'data'
 
   if (loading) {
     return (
@@ -159,15 +169,20 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
                 style={{ fontSize: "11px", fontFamily: "monospace" }}
                 domain={["auto", "auto"]}
                 tickFormatter={(value) => {
+                  // SAFE TICK FORMATTER
+                  if (!value || typeof value !== 'string') return '';
                   const parts = value.split("-")
-                  return `${parts[1]}/${parts[2]}`
+                  return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : value;
                 }}
               />
               <YAxis
                 stroke="#64748b"
                 style={{ fontSize: "11px", fontFamily: "monospace" }}
                 domain={["auto", "auto"]}
-                tickFormatter={(value) => `$${value.toFixed(0)}`}
+                tickFormatter={(value) => {
+                    // SAFE TICK FORMATTER
+                    return typeof value === 'number' ? `$${value.toFixed(0)}` : '';
+                }}
               />
               <Tooltip
                 contentStyle={{
@@ -178,7 +193,9 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
                   fontSize: "12px",
                 }}
                 labelStyle={{ color: "#94a3b8" }}
-                formatter={(value: number, name: string, props: any) => {
+                formatter={(value: any, name: string, props: any) => {
+                  // SAFE TOOLTIP FORMATTER
+                  if (typeof value !== 'number') return ["N/A", name];
                   const label = props.payload.isPrediction ? "Predicted" : "Historical"
                   return [`$${value.toFixed(2)}`, label]
                 }}
@@ -226,8 +243,9 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
                 fill="#0f172a"
                 travellerWidth={10}
                 tickFormatter={(value) => {
+                  if (!value || typeof value !== 'string') return '';
                   const parts = value.split("-")
-                  return `${parts[1]}/${parts[2]}`
+                  return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : value;
                 }}
               />
             </ComposedChart>
