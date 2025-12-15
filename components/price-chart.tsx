@@ -40,6 +40,7 @@ interface ChartPoint {
   forecast?: number;
   upperBand?: number;
   lowerBand?: number;
+  confidenceBand?: [number, number];
   rsi?: number;
   macd?: number;
   isPrediction: boolean;
@@ -94,32 +95,39 @@ function computeMACD(prices: number[]) {
 /* ----------------------------- Custom Tooltip ----------------------------- */
 
 const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload) return null;
+  if (!active || !payload || !payload.length) return null;
 
   const isPrediction = payload[0]?.payload?.isPrediction;
+  
+  // Filter unique entries to avoid duplicates
+  const seen = new Set();
+  const uniquePayload = payload.filter((entry: any) => {
+    if (!entry.value || entry.dataKey === 'confidenceBand') return false;
+    if (seen.has(entry.dataKey)) return false;
+    seen.add(entry.dataKey);
+    return true;
+  });
 
   return (
     <div className="bg-slate-950 border border-slate-700 rounded-lg p-3 shadow-xl">
       <p className="font-mono text-xs text-slate-400 mb-2">{label}</p>
-      {payload.map((entry: any, index: number) => {
-        if (!entry.value) return null;
-        
-        let label = entry.name;
+      {uniquePayload.map((entry: any, index: number) => {
+        let displayLabel = entry.name;
         let color = entry.color;
         
         // Customize labels
-        if (entry.dataKey === "upperBand") label = "Upper Bound";
-        if (entry.dataKey === "lowerBand") label = "Lower Bound";
-        if (entry.dataKey === "forecast") label = "Forecast";
-        if (entry.dataKey === "price") label = "Price";
+        if (entry.dataKey === "upperBand") displayLabel = "Upper Bound";
+        if (entry.dataKey === "lowerBand") displayLabel = "Lower Bound";
+        if (entry.dataKey === "forecast") displayLabel = "Forecast";
+        if (entry.dataKey === "price") displayLabel = "Price";
 
         return (
           <div key={index} className="flex items-center justify-between gap-4">
             <span className="font-mono text-xs" style={{ color }}>
-              {label}:
+              {displayLabel}:
             </span>
             <span className="font-mono text-xs font-semibold" style={{ color }}>
-              {entry.value.toFixed(2)}
+              {typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}
             </span>
           </div>
         );
@@ -197,17 +205,14 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       forecast: p.forecast,
       upperBand: p.upper,
       lowerBand: p.lower,
+      confidenceBand: [p.lower, p.upper] as [number, number],
       isPrediction: true,
     }));
 
-    // Add connection point - last historical price connects to first forecast
+    // Add forecast value to last historical point to create connection
     if (hist.length > 0 && pred.length > 0) {
       const lastHistorical = hist[hist.length - 1];
-      pred[0] = {
-        ...pred[0],
-        // Add a connecting point for smooth transition
-        price: lastHistorical.price,
-      };
+      lastHistorical.forecast = lastHistorical.price;
     }
 
     return {
@@ -300,6 +305,14 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       <div className="h-96">
         <ResponsiveContainer>
           <ComposedChart data={chartData}>
+            <defs>
+              <linearGradient id="colorConfidence" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity={0.25} />
+                <stop offset="50%" stopColor="#3b82f6" stopOpacity={0.15} />
+                <stop offset="100%" stopColor="#ef4444" stopOpacity={0.25} />
+              </linearGradient>
+            </defs>
+            
             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
             <XAxis 
               dataKey="date" 
@@ -332,14 +345,13 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               />
             )}
 
-            {/* Shaded confidence area (optional) */}
+            {/* Shaded confidence area between upper and lower bounds */}
             {showBands && (
               <Area
                 type="monotone"
-                dataKey="upperBand"
+                dataKey="confidenceBand"
                 stroke="none"
                 fill="url(#colorConfidence)"
-                fillOpacity={0.15}
                 connectNulls
               />
             )}
@@ -354,16 +366,18 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               connectNulls
             />
 
-            {/* Forecast Line */}
-            <Line
-              type="monotone"
-              dataKey="forecast"
-              stroke="#22d3ee"
-              strokeWidth={2.5}
-              strokeDasharray="8 4"
-              dot={{ fill: "#22d3ee", r: 4 }}
-              connectNulls
-            />
+            {/* Lower Band (Red) */}
+            {showBands && (
+              <Line
+                type="monotone"
+                dataKey="lowerBand"
+                stroke="#ef4444"
+                strokeWidth={2}
+                strokeDasharray="4 4"
+                dot={{ fill: "#ef4444", r: 3 }}
+                connectNulls
+              />
+            )}
 
             {/* Upper Band (Green) */}
             {showBands && (
@@ -378,26 +392,17 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               />
             )}
 
-            {/* Lower Band (Red) */}
-            {showBands && (
-              <Line
-                type="monotone"
-                dataKey="lowerBand"
-                stroke="#ef4444"
-                strokeWidth={2}
-                strokeDasharray="4 4"
-                dot={{ fill: "#ef4444", r: 3 }}
-                connectNulls
-              />
-            )}
-
-            {/* Gradient definition for confidence area */}
-            <defs>
-              <linearGradient id="colorConfidence" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#ef4444" stopOpacity={0.1} />
-              </linearGradient>
-            </defs>
+            {/* Forecast Line (Cyan) - Render LAST to ensure visibility */}
+            <Line
+              type="monotone"
+              dataKey="forecast"
+              stroke="#22d3ee"
+              strokeWidth={3}
+              strokeDasharray="8 4"
+              dot={{ fill: "#22d3ee", r: 4, strokeWidth: 2, stroke: "#0e7490" }}
+              connectNulls
+              activeDot={{ r: 6, strokeWidth: 2, stroke: "#0e7490" }}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
