@@ -38,8 +38,8 @@ interface ChartPoint {
   date: string;
   price?: number;
   forecast?: number;
-  lower?: number;
-  upper?: number;
+  upperBand?: number;
+  lowerBand?: number;
   rsi?: number;
   macd?: number;
   isPrediction: boolean;
@@ -106,6 +106,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
   useEffect(() => {
     let alive = true;
+
     const load = async () => {
       setLoading(true);
       try {
@@ -115,8 +116,6 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
         const f = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/api/price/forecast?ticker=${ticker}&days=${forecastDays}`
         );
-
-        if (!h.ok || !f.ok) throw new Error("Chart fetch failed");
 
         const hist = await h.json();
         const pred = await f.json();
@@ -154,8 +153,8 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
     const pred = forecast.map((p) => ({
       date: p.date,
       forecast: p.forecast,
-      upper: p.upper,
-      lower: p.lower,
+      upperBand: p.upper,
+      lowerBand: p.lower,
       isPrediction: true,
     }));
 
@@ -164,16 +163,15 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
   if (loading) {
     return (
-      <Card className="p-6">
-        <Skeleton className="h-96" />
+      <Card className="bg-slate-900/50 border border-slate-800 p-6">
+        <Skeleton className="h-96 bg-slate-800" />
       </Card>
     );
   }
 
-  /* ----------------------------- Render ----------------------------- */
-
   return (
-    <Card className="p-6 space-y-8">
+    <Card className="bg-slate-900/50 border border-slate-800 p-6 space-y-10">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="font-mono text-sm text-slate-400 uppercase">
           Price Forecast
@@ -225,35 +223,48 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
             <XAxis dataKey="date" />
             <YAxis />
-            <Tooltip />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "#020617",
+                border: "1px solid #1e293b",
+                borderRadius: 8,
+              }}
+              labelStyle={{ color: "#e5e7eb" }}
+            />
 
             {showBands && (
-              <Area
-                dataKey="upper"
-                baseLine="lower"
-                fill="rgba(16,185,129,0.15)"
-                stroke="none"
-              />
+              <>
+                <Area
+                  dataKey="upperBand"
+                  stackId="band"
+                  stroke="none"
+                  fill="rgba(16,185,129,0.25)"
+                />
+                <Area
+                  dataKey="lowerBand"
+                  stackId="band"
+                  stroke="none"
+                  fill="rgba(16,185,129,0.05)"
+                />
+              </>
             )}
 
             <Line
               dataKey="price"
               stroke="#facc15"
-              dot={false}
               strokeWidth={2}
+              dot={false}
             />
-
             <Line
               dataKey="forecast"
               stroke="#10b981"
               strokeDasharray="6 4"
-              dot
+              dot={{ r: 3 }}
             />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
-      {/* RSI */}
       {/* RSI */}
       <div className="h-36 space-y-2">
         <div className="flex items-center justify-between">
