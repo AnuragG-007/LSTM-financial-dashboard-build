@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,22 +9,36 @@ import type { PredictionData } from "@/app/page"
 
 interface ProfitSimulatorProps {
   data: PredictionData
+  forecastDays: number
 }
 
-export function ProfitSimulator({ data }: ProfitSimulatorProps) {
+export function ProfitSimulator({ data, forecastDays }: ProfitSimulatorProps) {
   const [investment, setInvestment] = useState("1000")
   const [projectedValue, setProjectedValue] = useState(0)
   const [profit, setProfit] = useState(0)
 
+  const selectedForecast = useMemo(() => {
+    if (!data?.forecastData || data.forecastData.length === 0) return null
+    return (
+      data.forecastData.find((f) => f.day === forecastDays) ??
+      data.forecastData[data.forecastData.length - 1]
+    )
+  }, [data?.forecastData, forecastDays])
+
+  const effectiveChangePct =
+    selectedForecast?.changePct ?? data.predictedChange
+  const effectiveTargetPrice =
+    selectedForecast?.price ?? data.predictedPrice
+
   useEffect(() => {
     const investmentAmount = Number.parseFloat(investment) || 0
-    const change = data.predictedChange / 100
+    const change = effectiveChangePct / 100
     const projected = investmentAmount * (1 + change)
     const profitAmount = projected - investmentAmount
 
     setProjectedValue(projected)
     setProfit(profitAmount)
-  }, [investment, data.predictedChange])
+  }, [investment, effectiveChangePct])
 
   const isPositive = profit > 0
 
@@ -36,11 +50,17 @@ export function ProfitSimulator({ data }: ProfitSimulatorProps) {
             <TrendingUp className="h-4 w-4" />
             Profit Simulator
           </h3>
-          <p className="text-xs text-slate-600 font-mono mt-1">Calculate potential returns based on AI prediction</p>
+          <p className="text-xs text-slate-600 font-mono mt-1">
+            Calculate potential returns based on AI prediction for {forecastDays}{" "}
+            {forecastDays === 1 ? "day" : "days"}
+          </p>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="investment" className="text-slate-400 font-mono text-xs uppercase">
+          <Label
+            htmlFor="investment"
+            className="text-slate-400 font-mono text-xs uppercase"
+          >
             Investment Amount ($)
           </Label>
           <div className="relative">
@@ -60,28 +80,44 @@ export function ProfitSimulator({ data }: ProfitSimulatorProps) {
 
         <div className="space-y-4 p-6 bg-slate-800/30 rounded-lg border border-slate-700/50">
           <div>
-            <p className="text-xs text-slate-500 font-mono uppercase mb-2">Projected Value</p>
-            <p className="text-4xl font-mono font-bold text-slate-50">${projectedValue.toFixed(2)}</p>
+            <p className="text-xs text-slate-500 font-mono uppercase mb-2">
+              Projected Value
+            </p>
+            <p className="text-4xl font-mono font-bold text-slate-50">
+              ${projectedValue.toFixed(2)}
+            </p>
+            <p className="text-xs text-slate-500 font-mono mt-1">
+              Target price: ${effectiveTargetPrice.toFixed(2)}
+            </p>
           </div>
 
           <div className="pt-4 border-t border-slate-700">
             <p className="text-xs text-slate-500 font-mono uppercase mb-2">
               Estimated {isPositive ? "Profit" : "Loss"}
             </p>
-            <p className={`text-3xl font-mono font-bold ${isPositive ? "text-emerald-500" : "text-rose-500"}`}>
+            <p
+              className={`text-3xl font-mono font-bold ${
+                isPositive ? "text-emerald-500" : "text-rose-500"
+              }`}
+            >
               {isPositive ? "+" : ""}${profit.toFixed(2)}
             </p>
-            <p className={`text-sm font-mono mt-1 ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+            <p
+              className={`text-sm font-mono mt-1 ${
+                isPositive ? "text-emerald-400" : "text-rose-400"
+              }`}
+            >
               ({isPositive ? "+" : ""}
-              {data.predictedChange.toFixed(2)}%)
+              {effectiveChangePct.toFixed(2)}%)
             </p>
           </div>
         </div>
 
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
           <p className="text-xs font-mono text-amber-400 leading-relaxed">
-            ⚠️ This is a simulated calculation based on AI predictions. Not financial advice. Past performance does not
-            guarantee future results.
+            ⚠️ This is a simulated calculation based on AI predictions. Not
+            financial advice. Past performance does not guarantee future
+            results.
           </p>
         </div>
       </div>

@@ -6,8 +6,26 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Toggle } from "@/components/ui/toggle"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Brush } from "recharts"
+import {
+  ComposedChart,
+  Line,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Brush,
+} from "recharts"
 import type { PredictionData } from "@/app/page"
+
+interface ChartPoint {
+  date: string
+  price: number
+  isPrediction: boolean
+  range?: [number, number]
+  sma50?: number
+}
 
 interface PriceChartProps {
   data: PredictionData
@@ -17,76 +35,98 @@ interface PriceChartProps {
 
 export function PriceChart({ data, loading = false, onForecastChange }: PriceChartProps) {
   const [forecastDays, setForecastDays] = useState(3)
-  const [chartData, setChartData] = useState<
-    Array<{
-      date: string
-      price: number
-      isPrediction: boolean
-      range?: [number, number]
-      sma50?: number
-    }>
-  >([])
+  const [chartData, setChartData] = useState<ChartPoint[]>([])
+  const [fetching, setFetching] = useState(false)
   const [showSMA, setShowSMA] = useState(false)
   const [showBounds, setShowBounds] = useState(true)
 
+  // keep parent in sync
   useEffect(() => {
     onForecastChange(forecastDays)
   }, [forecastDays, onForecastChange])
 
+  // fetch real historical + forecast data
   useEffect(() => {
-    // Safety check: Ensure data exists before processing
-    if (!data || typeof data.currentPrice !== 'number' || typeof data.predictedPrice !== 'number') {
-        return;
+    if (!data?.ticker) return
+
+    const controller = new AbortController()
+
+    const load = async () => {
+      try {
+        setFetching(true)
+
+        const historyRes = await fetch(
+          `/api/price/history?ticker=${encodeURIComponent(data.ticker)}&days=60`,
+          { signal: controller.signal },
+        )
+        const forecastRes = await fetch(
+          `/api/price/forecast?ticker=${encodeURIComponent(data.ticker)}&days=${forecastDays}`,
+          { signal: controller.signal },
+        )
+
+        if (!historyRes.ok || !forecastRes.ok) {
+          throw new Error("Failed to fetch chart data")
+        }
+
+        const history = (await historyRes.json()) as Array<{
+          date: string
+          price: number
+          sma50?: number
+        }>
+
+        const forecast = (await forecastRes.json()) as Array<{
+          date: string
+          price: number
+          lower?: number
+          upper?: number
+        }>
+
+        const historicalPoints: ChartPoint[] = history.map((p) => ({
+          date: p.date,
+          price: p.price,
+          isPrediction: false,
+          sma50: p.sma50,
+        }))
+
+        const lastHistorical = historicalPoints[historicalPoints.length - 1]
+
+        const safeForecast =
+          forecast.length > 0
+            ? forecast
+            : lastHistorical
+            ? [
+                {
+                  date: lastHistorical.date,
+                  price: data.predictedPrice,
+                  lower: data.predictedPrice,
+                  upper: data.predictedPrice,
+                },
+              ]
+            : []
+
+        const forecastPoints: ChartPoint[] = safeForecast.map((p) => ({
+          date: p.date,
+          price: p.price,
+          isPrediction: true,
+          range:
+            p.lower != null && p.upper != null ? [p.lower, p.upper] : undefined,
+        }))
+
+        const combined: ChartPoint[] = [...historicalPoints, ...forecastPoints]
+        setChartData(combined)
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return
+        console.error(err)
+      } finally {
+        setFetching(false)
+      }
     }
 
-    const basePrice = data.currentPrice
-    const historicalData = Array.from({ length: 30 }, (_, i) => {
-      const variance = Math.random() * 0.08 - 0.04
-      const price = basePrice * (1 + variance)
-      const date = new Date()
-      date.setDate(date.getDate() - (30 - i))
+    load()
+    return () => controller.abort()
+  }, [data?.ticker, forecastDays, data?.predictedPrice])
 
-      const sma50 = price * (0.98 + Math.random() * 0.04)
-
-      return {
-        date: date.toISOString().split("T")[0],
-        // Safety: Ensure Price is Number
-        price: Number((Math.round(price * 100) / 100).toFixed(2)),
-        isPrediction: false,
-        sma50: Number((Math.round(sma50 * 100) / 100).toFixed(2)),
-      }
-    })
-
-    const lastHistoricalPrice = historicalData[historicalData.length - 1].price
-    const targetPrice = data.predictedPrice
-    const priceStep = (targetPrice - lastHistoricalPrice) / forecastDays
-
-    const predictedData = Array.from({ length: forecastDays }, (_, i) => {
-      const dayIndex = i + 1
-      const price = lastHistoricalPrice + priceStep * dayIndex
-      const date = new Date()
-      date.setDate(date.getDate() + dayIndex)
-
-      const volatility = price * 0.01 * dayIndex
-      const lower_price = price - volatility
-      const upper_price = price + volatility
-
-      return {
-        date: date.toISOString().split("T")[0],
-        price: Number((Math.round(price * 100) / 100).toFixed(2)),
-        isPrediction: true,
-        // Safety: Ensure Range is Array of Numbers
-        range: [
-            Number((Math.round(lower_price * 100) / 100).toFixed(2)), 
-            Number((Math.round(upper_price * 100) / 100).toFixed(2))
-        ] as [number, number],
-      }
-    })
-
-    setChartData([...historicalData, ...predictedData])
-  }, [forecastDays, data]) // Dependency fixed to 'data'
-
-  if (loading) {
+  if (loading || fetching) {
     return (
       <Card className="bg-slate-900/50 border-slate-800 p-4 md:p-6">
         <div className="space-y-4">
@@ -111,13 +151,20 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
     <Card className="bg-slate-900/50 border-slate-800 p-4 md:p-6">
       <div className="space-y-4">
         <div>
-          <h3 className="text-sm font-mono text-slate-400 uppercase tracking-wide">Price Forecast</h3>
-          <p className="text-xs text-slate-600 font-mono mt-1">Interactive Timeline with Prediction Horizon</p>
+          <h3 className="text-sm font-mono text-slate-400 uppercase tracking-wide">
+            Price Forecast
+          </h3>
+          <p className="text-xs text-slate-600 font-mono mt-1">
+            Interactive Timeline with Prediction Horizon
+          </p>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="forecast-slider" className="text-sm font-mono text-slate-300">
+            <Label
+              htmlFor="forecast-slider"
+              className="text-sm font-mono text-slate-300"
+            >
               Prediction Horizon
             </Label>
             <span className="text-lg font-mono font-bold text-emerald-500">
@@ -141,7 +188,9 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
 
         <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-mono text-slate-400 mr-2">Indicators:</span>
+            <span className="text-xs font-mono text-slate-400 mr-2">
+              Indicators:
+            </span>
             <Toggle
               pressed={showSMA}
               onPressedChange={setShowSMA}
@@ -161,28 +210,28 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
 
         <div className="h-64 md:h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 5, right: 20, bottom: 25, left: 0 }}>
+            <ComposedChart
+              data={chartData}
+              margin={{ top: 5, right: 20, bottom: 25, left: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
               <XAxis
                 dataKey="date"
                 stroke="#64748b"
                 style={{ fontSize: "11px", fontFamily: "monospace" }}
-                domain={["auto", "auto"]}
                 tickFormatter={(value) => {
-                  // SAFE TICK FORMATTER
-                  if (!value || typeof value !== 'string') return '';
+                  if (!value || typeof value !== "string") return ""
                   const parts = value.split("-")
-                  return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : value;
+                  return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : value
                 }}
               />
               <YAxis
                 stroke="#64748b"
                 style={{ fontSize: "11px", fontFamily: "monospace" }}
                 domain={["auto", "auto"]}
-                tickFormatter={(value) => {
-                    // SAFE TICK FORMATTER
-                    return typeof value === 'number' ? `$${value.toFixed(0)}` : '';
-                }}
+                tickFormatter={(value) =>
+                  typeof value === "number" ? `$${value.toFixed(0)}` : ""
+                }
               />
               <Tooltip
                 contentStyle={{
@@ -193,24 +242,33 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
                   fontSize: "12px",
                 }}
                 labelStyle={{ color: "#94a3b8" }}
-                formatter={(value: any, name: string, props: any) => {
-                  // SAFE TOOLTIP FORMATTER
-                  if (typeof value !== 'number') return ["N/A", name];
-                  const label = props.payload.isPrediction ? "Predicted" : "Historical"
+                formatter={(value: any, _name: string, props: any) => {
+                  if (typeof value !== "number") return ["N/A", ""]
+                  const label = props.payload.isPrediction
+                    ? "Predicted"
+                    : "Historical"
                   return [`$${value.toFixed(2)}`, label]
                 }}
               />
 
-              {showBounds && <Area type="monotone" dataKey="range" stroke="none" fill="#10b981" fillOpacity={0.2} />}
+              {showBounds && (
+                <Area
+                  type="monotone"
+                  dataKey="range"
+                  stroke="none"
+                  fill="#10b981"
+                  fillOpacity={0.2}
+                />
+              )}
 
               <Line
                 type="monotone"
-                dataKey={(entry) => (!entry.isPrediction ? entry.price : null)}
+                dataKey="price"
                 stroke="#10b981"
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4, fill: "#10b981" }}
-                connectNulls={false}
+                connectNulls={true}
               />
 
               {showSMA && (
@@ -225,17 +283,6 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
                 />
               )}
 
-              <Line
-                type="monotone"
-                dataKey={(entry) => (entry.isPrediction ? entry.price : null)}
-                stroke="#fbbf24"
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                dot={false}
-                activeDot={{ r: 4, fill: "#fbbf24" }}
-                connectNulls={true}
-              />
-
               <Brush
                 dataKey="date"
                 height={30}
@@ -243,9 +290,9 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
                 fill="#0f172a"
                 travellerWidth={10}
                 tickFormatter={(value) => {
-                  if (!value || typeof value !== 'string') return '';
+                  if (!value || typeof value !== "string") return ""
                   const parts = value.split("-")
-                  return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : value;
+                  return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : value
                 }}
               />
             </ComposedChart>
@@ -255,15 +302,14 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
         <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 text-xs font-mono">
           <div className="flex items-center gap-2">
             <div className="h-0.5 w-8 bg-emerald-500" />
-            <span className="text-slate-400">Historical</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-0.5 w-8" style={{ borderTop: "2px dashed #fbbf24", background: "transparent" }} />
-            <span className="text-slate-400">Predicted</span>
+            <span className="text-slate-400">Historical &amp; Predicted</span>
           </div>
           {showSMA && (
             <div className="flex items-center gap-2">
-              <div className="h-0.5 w-8" style={{ borderTop: "2px dashed #fb923c", background: "transparent" }} />
+              <div
+                className="h-0.5 w-8"
+                style={{ borderTop: "2px dashed #fb923c", background: "transparent" }}
+              />
               <span className="text-slate-400">SMA-50</span>
             </div>
           )}
