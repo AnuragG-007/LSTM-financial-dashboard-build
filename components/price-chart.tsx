@@ -41,8 +41,7 @@ interface ChartPoint {
   forecast?: number;
   upperBand?: number;
   lowerBand?: number;
-  rangeBase?: number;
-  rangeTop?: number;
+  confidenceBand?: [number, number]; // <-- used for shading
   rsi?: number;
   macd?: number;
   isPrediction: boolean;
@@ -104,12 +103,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
   const seen = new Set();
   const uniquePayload = payload.filter((entry: any) => {
-    if (
-      !entry.value ||
-      entry.dataKey === "rangeBase" ||
-      entry.dataKey === "rangeTop"
-    )
-      return false;
+    if (!entry.value || entry.dataKey === "confidenceBand") return false; // exclude shading band
     if (seen.has(entry.dataKey)) return false;
     seen.add(entry.dataKey);
     return true;
@@ -226,8 +220,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       forecast: Number(p.price),
       upperBand: Number(p.upper),
       lowerBand: Number(p.lower),
-      rangeBase: Number(p.lower),
-      rangeTop: Number(p.upper) - Number(p.lower),
+      confidenceBand: [Number(p.lower), Number(p.upper)] as [number, number], // shading band
       isPrediction: true,
     }));
 
@@ -362,28 +355,15 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               />
             )}
 
-            {/* Shaded confidence band between lowerBand and upperBand */}
+            {/* Shaded confidence band strictly between lowerBand and upperBand */}
             {showBands && (
-              <>
-                {/* Transparent base at lowerBand */}
-                <Area
-                  type="monotone"
-                  dataKey="rangeBase"
-                  stackId="confidence"
-                  stroke="none"
-                  fill="transparent"
-                  connectNulls
-                />
-                {/* Visible band = upper - lower */}
-                <Area
-                  type="monotone"
-                  dataKey="rangeTop"
-                  stackId="confidence"
-                  stroke="none"
-                  fill="url(#colorConfidence)"
-                  connectNulls
-                />
-              </>
+              <Area
+                type="monotone"
+                dataKey="confidenceBand"
+                stroke="none"
+                fill="url(#colorConfidence)"
+                connectNulls
+              />
             )}
 
             <Line
