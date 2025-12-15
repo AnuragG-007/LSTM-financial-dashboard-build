@@ -30,7 +30,7 @@ interface PricePoint {
 // backend sends: { date, price, lower, upper }
 interface ForecastPoint {
   date: string;
-  price: number;    // <-- changed: was forecast
+  price: number;
   lower: number;
   upper: number;
 }
@@ -41,8 +41,6 @@ interface ChartPoint {
   forecast?: number;
   upperBand?: number;
   lowerBand?: number;
-  rangeBase?: number;
-  rangeTop?: number;
   rsi?: number;
   macd?: number;
   isPrediction: boolean;
@@ -104,8 +102,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
   const seen = new Set();
   const uniquePayload = payload.filter((entry: any) => {
-    if (!entry.value || entry.dataKey === "rangeBase" || entry.dataKey === "rangeTop")
-      return false;
+    if (!entry.value) return false;
     if (seen.has(entry.dataKey)) return false;
     seen.add(entry.dataKey);
     return true;
@@ -142,7 +139,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
               {displayLabel}:
             </span>
             <span className="font-mono text-xs font-semibold" style={{ color }}>
-              {typeof entry.value === "number" ? entry.value.toFixed(2) : entry.value}
+              {typeof entry.value === "number"
+                ? entry.value.toFixed(2)
+                : entry.value}
             </span>
           </div>
         );
@@ -217,11 +216,9 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
     const pred: ChartPoint[] = forecast.map((p) => ({
       date: p.date,
-      forecast: Number(p.price), // use backend "price" as forecast line value
+      forecast: Number(p.price),
       upperBand: Number(p.upper),
       lowerBand: Number(p.lower),
-      rangeBase: Number(p.lower),
-      rangeTop: Number(p.upper) - Number(p.lower),
       isPrediction: true,
     }));
 
@@ -247,7 +244,9 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
     <Card className="bg-slate-900/50 border border-slate-800 p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="font-mono text-sm text-slate-400 uppercase">Price Forecast</h3>
+        <h3 className="font-mono text-sm text-slate-400 uppercase">
+          Price Forecast
+        </h3>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-4 text-[11px] font-mono text-slate-400">
             <div className="flex items-center gap-1.5">
@@ -283,7 +282,9 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
       {/* Horizon */}
       <div className="space-y-2">
-        <Label className="font-mono text-xs text-slate-400">Prediction Horizon</Label>
+        <Label className="font-mono text-xs text-slate-400">
+          Prediction Horizon
+        </Label>
         <div className="flex items-center gap-3">
           <Button
             size="icon"
@@ -315,9 +316,9 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
         <ResponsiveContainer>
           <ComposedChart data={chartData}>
             <defs>
-              <linearGradient id="colorConfidence" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#ef4444" stopOpacity={0.3} />
+              <linearGradient id="colorBand" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#22c55e" stopOpacity={0.4} />
+                <stop offset="100%" stopColor="#ef4444" stopOpacity={0.15} />
               </linearGradient>
             </defs>
 
@@ -330,7 +331,10 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
                 return `${date.getMonth() + 1}/${date.getDate()}`;
               }}
             />
-            <YAxis tick={{ fill: "#64748b", fontSize: 11 }} domain={["auto", "auto"]} />
+            <YAxis
+              tick={{ fill: "#64748b", fontSize: 11 }}
+              domain={["auto", "auto"]}
+            />
             <Tooltip content={<CustomTooltip />} />
 
             {predictionStartDate && (
@@ -349,25 +353,21 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               />
             )}
 
+            {/* Shaded confidence band between lowerBand and upperBand */}
             {showBands && (
-              <>
-                <Area
-                  type="monotone"
-                  dataKey="rangeBase"
-                  stackId="confidence"
-                  stroke="none"
-                  fill="transparent"
-                  connectNulls
-                />
-                <Area
-                  type="monotone"
-                  dataKey="rangeTop"
-                  stackId="confidence"
-                  stroke="none"
-                  fill="url(#colorConfidence)"
-                  connectNulls
-                />
-              </>
+              <Area
+                type="monotone"
+                dataKey="upperBand"
+                stroke="none"
+                fill="url(#colorBand)"
+                fillOpacity={0.35}
+                connectNulls
+                baseLine={(data: any[]) =>
+                  data.map((d) =>
+                    typeof d.lowerBand === "number" ? d.lowerBand : d.upperBand
+                  )
+                }
+              />
             )}
 
             <Line
@@ -420,7 +420,9 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       {/* RSI */}
       <div className="h-36 space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs font-mono text-slate-400">RSI (0–100)</Label>
+          <Label className="text-xs font-mono text-slate-400">
+            RSI (0–100)
+          </Label>
           <div className="flex items-center gap-4 text-[11px] font-mono text-slate-500">
             <div className="flex items-center gap-1">
               <span className="h-2 w-4 bg-[#38bdf8] rounded-sm" />
@@ -439,11 +441,20 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
         <ResponsiveContainer>
           <ComposedChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#1e293b"
+              vertical={false}
+            />
             <YAxis domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 11 }} />
             <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" />
             <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="3 3" />
-            <Line dataKey="rsi" stroke="#38bdf8" strokeWidth={1.5} dot={false} />
+            <Line
+              dataKey="rsi"
+              stroke="#38bdf8"
+              strokeWidth={1.5}
+              dot={false}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -466,10 +477,19 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
         <ResponsiveContainer>
           <ComposedChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#1e293b"
+              vertical={false}
+            />
             <YAxis tick={{ fill: "#64748b", fontSize: 11 }} />
             <ReferenceLine y={0} stroke="#64748b" />
-            <Line dataKey="macd" stroke="#facc15" strokeWidth={1.5} dot={false} />
+            <Line
+              dataKey="macd"
+              stroke="#facc15"
+              strokeWidth={1.5}
+              dot={false}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
