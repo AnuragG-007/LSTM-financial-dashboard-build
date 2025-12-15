@@ -91,6 +91,48 @@ function computeMACD(prices: number[]) {
   return fast.map((v, i) => v - (slow[i] ?? v));
 }
 
+/* ----------------------------- Custom Tooltip ----------------------------- */
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload) return null;
+
+  const isPrediction = payload[0]?.payload?.isPrediction;
+
+  return (
+    <div className="bg-slate-950 border border-slate-700 rounded-lg p-3 shadow-xl">
+      <p className="font-mono text-xs text-slate-400 mb-2">{label}</p>
+      {payload.map((entry: any, index: number) => {
+        if (!entry.value) return null;
+        
+        let label = entry.name;
+        let color = entry.color;
+        
+        // Customize labels
+        if (entry.dataKey === "upperBand") label = "Upper Bound";
+        if (entry.dataKey === "lowerBand") label = "Lower Bound";
+        if (entry.dataKey === "forecast") label = "Forecast";
+        if (entry.dataKey === "price") label = "Price";
+
+        return (
+          <div key={index} className="flex items-center justify-between gap-4">
+            <span className="font-mono text-xs" style={{ color }}>
+              {label}:
+            </span>
+            <span className="font-mono text-xs font-semibold" style={{ color }}>
+              {entry.value.toFixed(2)}
+            </span>
+          </div>
+        );
+      })}
+      {isPrediction && (
+        <p className="font-mono text-[10px] text-cyan-400 mt-2 border-t border-slate-800 pt-2">
+          ⚡ Prediction
+        </p>
+      )}
+    </div>
+  );
+};
+
 /* ----------------------------- Component ----------------------------- */
 
 export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
@@ -135,8 +177,8 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
     };
   }, [ticker, forecastDays]);
 
-  const chartData: ChartPoint[] = useMemo(() => {
-    if (!history.length) return [];
+  const { chartData, predictionStartDate } = useMemo(() => {
+    if (!history.length) return { chartData: [], predictionStartDate: null };
 
     const prices = history.map((p) => p.price);
     const rsi = computeRSI(prices);
@@ -158,7 +200,20 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       isPrediction: true,
     }));
 
-    return [...hist, ...pred];
+    // Add connection point - last historical price connects to first forecast
+    if (hist.length > 0 && pred.length > 0) {
+      const lastHistorical = hist[hist.length - 1];
+      pred[0] = {
+        ...pred[0],
+        // Add a connecting point for smooth transition
+        price: lastHistorical.price,
+      };
+    }
+
+    return {
+      chartData: [...hist, ...pred],
+      predictionStartDate: pred.length > 0 ? pred[0].date : null,
+    };
   }, [history, forecast]);
 
   if (loading) {
@@ -170,19 +225,44 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
   }
 
   return (
-    <Card className="bg-slate-900/50 border border-slate-800 p-6 space-y-10">
+    <Card className="bg-slate-900/50 border border-slate-800 p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="font-mono text-sm text-slate-400 uppercase">
           Price Forecast
         </h3>
-        <Toggle
-          pressed={showBands}
-          onPressedChange={setShowBands}
-          className="text-xs font-mono"
-        >
-          Confidence Bands
-        </Toggle>
+        <div className="flex items-center gap-3">
+          {/* Legend */}
+          <div className="flex items-center gap-4 text-[11px] font-mono text-slate-400">
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-full bg-yellow-400" />
+              <span>Historical</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-full bg-cyan-400" />
+              <span>Forecast</span>
+            </div>
+            {showBands && (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span>Upper</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2 w-2 rounded-full bg-red-500" />
+                  <span>Lower</span>
+                </div>
+              </>
+            )}
+          </div>
+          <Toggle
+            pressed={showBands}
+            onPressedChange={setShowBands}
+            className="text-xs font-mono"
+          >
+            Confidence Bands
+          </Toggle>
+        </div>
       </div>
 
       {/* Horizon */}
@@ -216,51 +296,108 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
         </div>
       </div>
 
-      {/* PRICE */}
+      {/* PRICE CHART */}
       <div className="h-96">
         <ResponsiveContainer>
           <ComposedChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#020617",
-                border: "1px solid #1e293b",
-                borderRadius: 8,
+            <XAxis 
+              dataKey="date" 
+              tick={{ fill: "#64748b", fontSize: 11 }}
+              tickFormatter={(value) => {
+                const date = new Date(value);
+                return `${date.getMonth() + 1}/${date.getDate()}`;
               }}
-              labelStyle={{ color: "#e5e7eb" }}
             />
+            <YAxis 
+              tick={{ fill: "#64748b", fontSize: 11 }}
+              domain={['auto', 'auto']}
+            />
+            <Tooltip content={<CustomTooltip />} />
 
-            {showBands && (
-              <>
-                <Area
-                  dataKey="upperBand"
-                  stackId="band"
-                  stroke="none"
-                  fill="rgba(16,185,129,0.25)"
-                />
-                <Area
-                  dataKey="lowerBand"
-                  stackId="band"
-                  stroke="none"
-                  fill="rgba(16,185,129,0.05)"
-                />
-              </>
+            {/* Vertical line marking prediction start */}
+            {predictionStartDate && (
+              <ReferenceLine
+                x={predictionStartDate}
+                stroke="#64748b"
+                strokeDasharray="5 5"
+                strokeWidth={1.5}
+                label={{
+                  value: "Forecast →",
+                  position: "top",
+                  fill: "#64748b",
+                  fontSize: 10,
+                  fontFamily: "monospace",
+                }}
+              />
             )}
 
+            {/* Shaded confidence area (optional) */}
+            {showBands && (
+              <Area
+                type="monotone"
+                dataKey="upperBand"
+                stroke="none"
+                fill="url(#colorConfidence)"
+                fillOpacity={0.15}
+                connectNulls
+              />
+            )}
+
+            {/* Historical Price Line */}
             <Line
+              type="monotone"
               dataKey="price"
               stroke="#facc15"
-              strokeWidth={2}
+              strokeWidth={2.5}
               dot={false}
+              connectNulls
             />
+
+            {/* Forecast Line */}
             <Line
+              type="monotone"
               dataKey="forecast"
-              stroke="#10b981"
-              strokeDasharray="6 4"
-              dot={{ r: 3 }}
+              stroke="#22d3ee"
+              strokeWidth={2.5}
+              strokeDasharray="8 4"
+              dot={{ fill: "#22d3ee", r: 4 }}
+              connectNulls
             />
+
+            {/* Upper Band (Green) */}
+            {showBands && (
+              <Line
+                type="monotone"
+                dataKey="upperBand"
+                stroke="#10b981"
+                strokeWidth={2}
+                strokeDasharray="4 4"
+                dot={{ fill: "#10b981", r: 3 }}
+                connectNulls
+              />
+            )}
+
+            {/* Lower Band (Red) */}
+            {showBands && (
+              <Line
+                type="monotone"
+                dataKey="lowerBand"
+                stroke="#ef4444"
+                strokeWidth={2}
+                strokeDasharray="4 4"
+                dot={{ fill: "#ef4444", r: 3 }}
+                connectNulls
+              />
+            )}
+
+            {/* Gradient definition for confidence area */}
+            <defs>
+              <linearGradient id="colorConfidence" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#ef4444" stopOpacity={0.1} />
+              </linearGradient>
+            </defs>
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -291,6 +428,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
         <ResponsiveContainer>
           <ComposedChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
             <YAxis domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 11 }} />
             <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" />
             <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="3 3" />
@@ -324,6 +462,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
         <ResponsiveContainer>
           <ComposedChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
             <YAxis tick={{ fill: "#64748b", fontSize: 11 }} />
             <ReferenceLine y={0} stroke="#64748b" />
             <Line
