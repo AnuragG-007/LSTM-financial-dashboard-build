@@ -27,9 +27,10 @@ interface PricePoint {
   price: number;
 }
 
+// backend sends: { date, price, lower, upper }
 interface ForecastPoint {
   date: string;
-  forecast: number;
+  price: number;    // <-- changed: was forecast
   lower: number;
   upper: number;
 }
@@ -100,25 +101,23 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
   const dataPoint = payload[0]?.payload;
   const isPrediction = dataPoint?.isPrediction;
-  
-  // Filter unique entries and exclude rangeBase/rangeTop used for shading
+
   const seen = new Set();
   const uniquePayload = payload.filter((entry: any) => {
-    if (!entry.value || entry.dataKey === 'rangeBase' || entry.dataKey === 'rangeTop') return false;
+    if (!entry.value || entry.dataKey === "rangeBase" || entry.dataKey === "rangeTop")
+      return false;
     if (seen.has(entry.dataKey)) return false;
     seen.add(entry.dataKey);
     return true;
   });
 
-  // Custom sort order for prediction tooltip
   const sortOrder: Record<string, number> = {
-    'forecast': 0,
-    'upperBand': 1,
-    'lowerBand': 2,
-    'price': 3
+    forecast: 0,
+    upperBand: 1,
+    lowerBand: 2,
+    price: 3,
   };
 
-  // Sort entries based on custom order
   const sortedPayload = uniquePayload.sort((a: any, b: any) => {
     const orderA = sortOrder[a.dataKey] ?? 99;
     const orderB = sortOrder[b.dataKey] ?? 99;
@@ -131,8 +130,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       {sortedPayload.map((entry: any, index: number) => {
         let displayLabel = entry.name;
         let color = entry.color;
-        
-        // Customize labels
+
         if (entry.dataKey === "upperBand") displayLabel = "Upper Bound";
         if (entry.dataKey === "lowerBand") displayLabel = "Lower Bound";
         if (entry.dataKey === "forecast") displayLabel = "Forecast";
@@ -144,7 +142,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
               {displayLabel}:
             </span>
             <span className="font-mono text-xs font-semibold" style={{ color }}>
-              {typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}
+              {typeof entry.value === "number" ? entry.value.toFixed(2) : entry.value}
             </span>
           </div>
         );
@@ -209,8 +207,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
     const rsi = computeRSI(prices);
     const macd = computeMACD(prices);
 
-    // Historical data
-    const hist = history.map((p, i) => ({
+    const hist: ChartPoint[] = history.map((p, i) => ({
       date: p.date,
       price: p.price,
       rsi: rsi[i],
@@ -218,10 +215,9 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       isPrediction: false,
     }));
 
-    // Prediction data - ENSURE forecast is explicitly set
-    const pred = forecast.map((p) => ({
+    const pred: ChartPoint[] = forecast.map((p) => ({
       date: p.date,
-      forecast: Number(p.forecast), // Ensure it's a number
+      forecast: Number(p.price), // use backend "price" as forecast line value
       upperBand: Number(p.upper),
       lowerBand: Number(p.lower),
       rangeBase: Number(p.lower),
@@ -229,7 +225,6 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       isPrediction: true,
     }));
 
-    // Connection: Add forecast to last historical point
     if (hist.length > 0 && pred.length > 0) {
       hist[hist.length - 1].forecast = hist[hist.length - 1].price;
     }
@@ -252,11 +247,8 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
     <Card className="bg-slate-900/50 border border-slate-800 p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="font-mono text-sm text-slate-400 uppercase">
-          Price Forecast
-        </h3>
+        <h3 className="font-mono text-sm text-slate-400 uppercase">Price Forecast</h3>
         <div className="flex items-center gap-3">
-          {/* Legend */}
           <div className="flex items-center gap-4 text-[11px] font-mono text-slate-400">
             <div className="flex items-center gap-1.5">
               <div className="h-2 w-2 rounded-full bg-yellow-400" />
@@ -291,9 +283,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
       {/* Horizon */}
       <div className="space-y-2">
-        <Label className="font-mono text-xs text-slate-400">
-          Prediction Horizon
-        </Label>
+        <Label className="font-mono text-xs text-slate-400">Prediction Horizon</Label>
         <div className="flex items-center gap-3">
           <Button
             size="icon"
@@ -330,23 +320,19 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
                 <stop offset="100%" stopColor="#ef4444" stopOpacity={0.3} />
               </linearGradient>
             </defs>
-            
+
             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-            <XAxis 
-              dataKey="date" 
+            <XAxis
+              dataKey="date"
               tick={{ fill: "#64748b", fontSize: 11 }}
               tickFormatter={(value) => {
                 const date = new Date(value);
                 return `${date.getMonth() + 1}/${date.getDate()}`;
               }}
             />
-            <YAxis 
-              tick={{ fill: "#64748b", fontSize: 11 }}
-              domain={['auto', 'auto']}
-            />
+            <YAxis tick={{ fill: "#64748b", fontSize: 11 }} domain={["auto", "auto"]} />
             <Tooltip content={<CustomTooltip />} />
 
-            {/* Vertical line marking prediction start */}
             {predictionStartDate && (
               <ReferenceLine
                 x={predictionStartDate}
@@ -363,7 +349,6 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               />
             )}
 
-            {/* Shaded confidence area using stacked Areas */}
             {showBands && (
               <>
                 <Area
@@ -385,7 +370,6 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               </>
             )}
 
-            {/* Historical Price Line */}
             <Line
               type="monotone"
               dataKey="price"
@@ -395,7 +379,6 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               connectNulls
             />
 
-            {/* Lower Band (Red) */}
             {showBands && (
               <Line
                 type="monotone"
@@ -408,7 +391,6 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               />
             )}
 
-            {/* Upper Band (Green) */}
             {showBands && (
               <Line
                 type="monotone"
@@ -421,7 +403,6 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               />
             )}
 
-            {/* Forecast Line (Cyan) - RENDER LAST */}
             <Line
               type="monotone"
               dataKey="forecast"
@@ -439,11 +420,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       {/* RSI */}
       <div className="h-36 space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs font-mono text-slate-400">
-            RSI (0–100)
-          </Label>
-
-          {/* RSI Legend */}
+          <Label className="text-xs font-mono text-slate-400">RSI (0–100)</Label>
           <div className="flex items-center gap-4 text-[11px] font-mono text-slate-500">
             <div className="flex items-center gap-1">
               <span className="h-2 w-4 bg-[#38bdf8] rounded-sm" />
@@ -466,12 +443,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
             <YAxis domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 11 }} />
             <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" />
             <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="3 3" />
-            <Line
-              dataKey="rsi"
-              stroke="#38bdf8"
-              strokeWidth={1.5}
-              dot={false}
-            />
+            <Line dataKey="rsi" stroke="#38bdf8" strokeWidth={1.5} dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -480,8 +452,6 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       <div className="h-36 space-y-2">
         <div className="flex items-center justify-between">
           <Label className="text-xs font-mono text-slate-400">MACD</Label>
-
-          {/* MACD Legend */}
           <div className="flex items-center gap-4 text-[11px] font-mono text-slate-500">
             <div className="flex items-center gap-1">
               <span className="h-2 w-4 bg-[#facc15] rounded-sm" />
@@ -499,12 +469,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
             <YAxis tick={{ fill: "#64748b", fontSize: 11 }} />
             <ReferenceLine y={0} stroke="#64748b" />
-            <Line
-              dataKey="macd"
-              stroke="#facc15"
-              strokeWidth={1.5}
-              dot={false}
-            />
+            <Line dataKey="macd" stroke="#facc15" strokeWidth={1.5} dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
