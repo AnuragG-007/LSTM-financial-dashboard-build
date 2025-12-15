@@ -99,7 +99,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
   const isPrediction = payload[0]?.payload?.isPrediction;
   
-  // Filter unique entries to avoid duplicates
+  // Filter unique entries and exclude confidenceBand
   const seen = new Set();
   const uniquePayload = payload.filter((entry: any) => {
     if (!entry.value || entry.dataKey === 'confidenceBand') return false;
@@ -108,10 +108,25 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return true;
   });
 
+  // Custom sort order for prediction tooltip
+  const sortOrder: Record<string, number> = {
+    'forecast': 0,
+    'upperBand': 1,
+    'lowerBand': 2,
+    'price': 3
+  };
+
+  // Sort entries based on custom order
+  const sortedPayload = uniquePayload.sort((a: any, b: any) => {
+    const orderA = sortOrder[a.dataKey] ?? 99;
+    const orderB = sortOrder[b.dataKey] ?? 99;
+    return orderA - orderB;
+  });
+
   return (
     <div className="bg-slate-950 border border-slate-700 rounded-lg p-3 shadow-xl">
       <p className="font-mono text-xs text-slate-400 mb-2">{label}</p>
-      {uniquePayload.map((entry: any, index: number) => {
+      {sortedPayload.map((entry: any, index: number) => {
         let displayLabel = entry.name;
         let color = entry.color;
         
