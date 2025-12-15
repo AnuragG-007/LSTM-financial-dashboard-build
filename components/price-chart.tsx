@@ -40,7 +40,8 @@ interface ChartPoint {
   forecast?: number;
   upperBand?: number;
   lowerBand?: number;
-  confidenceBand?: [number, number];
+  rangeBase?: number;
+  rangeTop?: number;
   rsi?: number;
   macd?: number;
   isPrediction: boolean;
@@ -97,12 +98,13 @@ function computeMACD(prices: number[]) {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload || !payload.length) return null;
 
-  const isPrediction = payload[0]?.payload?.isPrediction;
+  const dataPoint = payload[0]?.payload;
+  const isPrediction = dataPoint?.isPrediction;
   
-  // Filter unique entries and exclude confidenceBand
+  // Filter unique entries and exclude rangeBase/rangeTop used for shading
   const seen = new Set();
   const uniquePayload = payload.filter((entry: any) => {
-    if (!entry.value || entry.dataKey === 'confidenceBand') return false;
+    if (!entry.value || entry.dataKey === 'rangeBase' || entry.dataKey === 'rangeTop') return false;
     if (seen.has(entry.dataKey)) return false;
     seen.add(entry.dataKey);
     return true;
@@ -220,14 +222,22 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       forecast: p.forecast,
       upperBand: p.upper,
       lowerBand: p.lower,
-      confidenceBand: [p.lower, p.upper] as [number, number],
+      rangeBase: p.lower,
+      rangeTop: p.upper - p.lower,
       isPrediction: true,
     }));
 
-    // Add forecast value to last historical point to create connection
+    // CRITICAL: Add connection point with forecast value
     if (hist.length > 0 && pred.length > 0) {
       const lastHistorical = hist[hist.length - 1];
+      const firstPrediction = pred[0];
+      
+      // Add forecast to last historical point equal to historical price
       lastHistorical.forecast = lastHistorical.price;
+      
+      // Add forecast to first prediction point equal to first forecast value
+      // This ensures the line connects smoothly
+      firstPrediction.forecast = firstPrediction.forecast;
     }
 
     return {
@@ -322,9 +332,8 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
           <ComposedChart data={chartData}>
             <defs>
               <linearGradient id="colorConfidence" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity={0.25} />
-                <stop offset="50%" stopColor="#3b82f6" stopOpacity={0.15} />
-                <stop offset="100%" stopColor="#ef4444" stopOpacity={0.25} />
+                <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#ef4444" stopOpacity={0.3} />
               </linearGradient>
             </defs>
             
@@ -360,15 +369,26 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               />
             )}
 
-            {/* Shaded confidence area between upper and lower bounds */}
+            {/* Shaded confidence area using stacked Areas */}
             {showBands && (
-              <Area
-                type="monotone"
-                dataKey="confidenceBand"
-                stroke="none"
-                fill="url(#colorConfidence)"
-                connectNulls
-              />
+              <>
+                <Area
+                  type="monotone"
+                  dataKey="rangeBase"
+                  stackId="confidence"
+                  stroke="none"
+                  fill="transparent"
+                  connectNulls
+                />
+                <Area
+                  type="monotone"
+                  dataKey="rangeTop"
+                  stackId="confidence"
+                  stroke="none"
+                  fill="url(#colorConfidence)"
+                  connectNulls
+                />
+              </>
             )}
 
             {/* Historical Price Line */}
@@ -381,6 +401,18 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               connectNulls
             />
 
+            {/* Forecast Line (Cyan) - MUST be before bounds to ensure it renders */}
+            <Line
+              type="monotone"
+              dataKey="forecast"
+              stroke="#22d3ee"
+              strokeWidth={3}
+              strokeDasharray="5 5"
+              dot={{ fill: "#22d3ee", r: 5, strokeWidth: 2, stroke: "#164e63" }}
+              connectNulls={true}
+              activeDot={{ r: 7, strokeWidth: 2, stroke: "#164e63" }}
+            />
+
             {/* Lower Band (Red) */}
             {showBands && (
               <Line
@@ -388,7 +420,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
                 dataKey="lowerBand"
                 stroke="#ef4444"
                 strokeWidth={2}
-                strokeDasharray="4 4"
+                strokeDasharray="3 3"
                 dot={{ fill: "#ef4444", r: 3 }}
                 connectNulls
               />
@@ -401,23 +433,11 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
                 dataKey="upperBand"
                 stroke="#10b981"
                 strokeWidth={2}
-                strokeDasharray="4 4"
+                strokeDasharray="3 3"
                 dot={{ fill: "#10b981", r: 3 }}
                 connectNulls
               />
             )}
-
-            {/* Forecast Line (Cyan) - Render LAST to ensure visibility */}
-            <Line
-              type="monotone"
-              dataKey="forecast"
-              stroke="#22d3ee"
-              strokeWidth={3}
-              strokeDasharray="8 4"
-              dot={{ fill: "#22d3ee", r: 4, strokeWidth: 2, stroke: "#0e7490" }}
-              connectNulls
-              activeDot={{ r: 6, strokeWidth: 2, stroke: "#0e7490" }}
-            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
