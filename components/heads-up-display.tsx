@@ -33,7 +33,7 @@ export function HeadsUpDisplay({
   const [copied, setCopied] = useState(false)
 
   /* -----------------------------
-     Derived view (single source of truth)
+     Derived view
   ----------------------------- */
   const view = useMemo(() => {
     const forecastPoint =
@@ -54,12 +54,7 @@ export function HeadsUpDisplay({
         ? "Medium"
         : "Low"
 
-    return {
-      targetPrice,
-      priceChangePct,
-      isBullish,
-      confidence,
-    }
+    return { targetPrice, priceChangePct, isBullish, confidence }
   }, [data, forecastDays])
 
   /* -----------------------------
@@ -89,14 +84,14 @@ Change: ${view.priceChangePct.toFixed(2)}%`
   return (
     <Card className="bg-slate-900/50 border-slate-800 p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-sm font-mono text-slate-400 uppercase tracking-wide">
+          <p className="text-xs font-mono uppercase tracking-wide text-slate-500">
             Market Intelligence
-          </h2>
-          <p className="font-mono text-slate-200 text-lg">
-            {data.ticker}
           </p>
+          <h2 className="font-mono text-xl text-slate-100">
+            {data.ticker}
+          </h2>
         </div>
 
         <Button
@@ -120,10 +115,10 @@ Change: ${view.priceChangePct.toFixed(2)}%`
       </div>
 
       {/* Main Grid */}
-      <div className="grid gap-6 md:grid-cols-[1.3fr_1fr_1fr]">
-        {/* SIGNAL (dominant) */}
+      <div className="grid gap-6 md:grid-cols-[1.4fr_1fr_1fr]">
+        {/* SIGNAL */}
         <div className="flex flex-col justify-center rounded-lg border border-slate-800 bg-slate-900/60 p-6">
-          <span className="text-xs font-mono text-slate-500 uppercase mb-2">
+          <span className="text-xs font-mono uppercase text-slate-500 mb-2">
             AI Signal
           </span>
 
@@ -152,22 +147,24 @@ Change: ${view.priceChangePct.toFixed(2)}%`
           </div>
         </div>
 
-        {/* PRICE ACTION */}
+        {/* PRICE */}
         <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-6 space-y-4">
-          <h3 className="text-xs font-mono text-slate-400 uppercase flex items-center gap-2">
+          <h3 className="text-xs font-mono uppercase text-slate-400 flex items-center gap-2">
             <Target className="h-4 w-4" />
             Price
           </h3>
 
           <div>
-            <p className="text-xs text-slate-500 font-mono">Current</p>
+            <p className="text-xs font-mono text-slate-500">
+              Current
+            </p>
             <p className="text-3xl font-mono font-bold">
               ${data.currentPrice.toFixed(2)}
             </p>
           </div>
 
           <div>
-            <p className="text-xs text-slate-500 font-mono">
+            <p className="text-xs font-mono text-slate-500">
               Target ({forecastDays}D)
             </p>
             <p className="text-xl font-mono">
@@ -176,9 +173,9 @@ Change: ${view.priceChangePct.toFixed(2)}%`
           </div>
         </div>
 
-        {/* AI METRICS */}
+        {/* INDICATORS */}
         <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-6 space-y-4">
-          <h3 className="text-xs font-mono text-slate-400 uppercase flex items-center gap-2">
+          <h3 className="text-xs font-mono uppercase text-slate-400 flex items-center gap-2">
             <Brain className="h-4 w-4" />
             Indicators
           </h3>
@@ -200,11 +197,20 @@ Change: ${view.priceChangePct.toFixed(2)}%`
                   : "bg-amber-500"
               }
             />
+            <p className="mt-1 text-[11px] font-mono text-slate-500">
+              {data.rsi > 70
+                ? "Overbought"
+                : data.rsi < 30
+                ? "Oversold"
+                : "Neutral"}
+            </p>
           </div>
 
           {/* MACD */}
           <div className="flex justify-between items-center">
-            <span className="text-xs font-mono text-slate-500">MACD</span>
+            <span className="text-xs font-mono text-slate-500">
+              MACD
+            </span>
             <Badge
               variant="outline"
               className={
@@ -220,7 +226,7 @@ Change: ${view.priceChangePct.toFixed(2)}%`
           {/* Confidence */}
           <div className="flex justify-between items-center">
             <span className="text-xs font-mono text-slate-500">
-              Confidence
+              Model Confidence
             </span>
             <Badge
               variant="outline"

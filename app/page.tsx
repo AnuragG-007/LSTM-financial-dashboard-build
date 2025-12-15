@@ -8,7 +8,7 @@ import { ProfitSimulator } from "@/components/profit-simulator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card } from "@/components/ui/card"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, BarChart3 } from "lucide-react"
 
 export type PredictionData = {
   ticker: string
@@ -52,12 +52,14 @@ export default function QuantMindDashboard() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="mx-auto max-w-6xl px-4 py-6 space-y-6">
-        {/* Command / Search */}
-        <SearchBar onSearch={fetchPrediction} />
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto max-w-6xl px-4 py-8 space-y-8">
+        {/* SEARCH */}
+        <section>
+          <SearchBar onSearch={fetchPrediction} />
+        </section>
 
-        {/* Error */}
+        {/* ERROR */}
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -65,47 +67,46 @@ export default function QuantMindDashboard() {
           </Alert>
         )}
 
-        {/* Loading */}
+        {/* LOADING */}
         {loading && (
-          <div className="space-y-4">
-            <Skeleton className="h-28 bg-slate-800/60" />
-            <Skeleton className="h-96 bg-slate-800/60" />
-          </div>
+          <section className="space-y-6">
+            <Skeleton className="h-40 rounded-lg" />
+            <Skeleton className="h-[420px] rounded-lg" />
+          </section>
         )}
 
-        {/* Main Content */}
+        {/* DATA VIEW */}
         {data && !loading && (
-          <div className="space-y-6">
-            {/* Decision summary */}
-            <HeadsUpDisplay data={data} forecastDays={forecastDays} />
+          <>
+            {/* HEADS UP DISPLAY */}
+            <section>
+              <HeadsUpDisplay data={data} forecastDays={forecastDays} />
+            </section>
 
-            {/* Chart + Tools */}
-            <div className="grid gap-6 lg:grid-cols-[2.2fr_1fr]">
-              {/* Primary: Price & Forecast */}
+            {/* ANALYSIS */}
+            <section className="grid gap-6 lg:grid-cols-[2fr,1fr]">
               <PriceChart
                 ticker={data.ticker}
                 onForecastChange={setForecastDays}
               />
-
-              {/* Secondary: Simulation */}
               <ProfitSimulator
                 data={data}
                 forecastDays={forecastDays}
               />
-            </div>
-          </div>
+            </section>
+          </>
         )}
 
-        {/* Empty State */}
+        {/* EMPTY STATE */}
         {!data && !loading && !error && (
-          <Card className="border border-dashed border-slate-800 bg-slate-900/40 p-8">
-            <div className="text-center space-y-2">
-              <p className="font-mono text-slate-300">
-                Market intelligence ready
+          <Card className="border-dashed border-slate-800 bg-slate-900/40 p-10 text-center">
+            <div className="flex flex-col items-center gap-3">
+              <BarChart3 className="h-6 w-6 text-slate-500" />
+              <p className="font-mono text-sm text-slate-400">
+                Enter a ticker to begin market analysis
               </p>
-              <p className="text-xs font-mono text-slate-500">
-                Enter a ticker above to generate AI-powered forecasts and risk
-                metrics
+              <p className="font-mono text-xs text-slate-600">
+                Stocks, ETFs, and crypto pairs supported
               </p>
             </div>
           </Card>

@@ -1,23 +1,21 @@
 export default function Loading() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950">
-      <div className="flex flex-col items-center gap-3">
-        {/* Subtle activity indicator */}
-        <div className="flex items-center gap-1">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse delay-150" />
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse delay-300" />
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-4">
+        {/* Spinner */}
+        <div className="relative">
+          <div className="h-10 w-10 rounded-full border-2 border-slate-700 border-t-emerald-400 animate-spin" />
         </div>
 
-        {/* Status text */}
-        <p className="text-slate-400 font-mono text-sm tracking-wide">
-          Initializing market intelligence…
-        </p>
-
-        {/* Subtext */}
-        <p className="text-slate-600 font-mono text-[11px]">
-          Fetching data · Running models · Preparing charts
-        </p>
+        {/* Text */}
+        <div className="text-center space-y-1">
+          <p className="font-mono text-sm text-slate-300 tracking-wide">
+            Initializing QuantMind
+          </p>
+          <p className="font-mono text-xs text-slate-500">
+            Fetching market data & generating forecasts…
+          </p>
+        </div>
       </div>
     </div>
   )

@@ -1,23 +1,40 @@
 "use client"
 
 import { useState, type KeyboardEvent } from "react"
-import { Search } from "lucide-react"
+import { Search, CornerDownLeft, Info } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 interface SearchBarProps {
   onSearch: (ticker: string) => void
 }
 
+/* -----------------------------
+   Supported universe (Alpha Vantage)
+----------------------------- */
+const SUPPORTED_TICKERS = [
+  // US Stocks
+  "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL",
+  "META", "TSLA", "AMD", "NFLX", "JPM",
+
+  // ETFs
+  "SPY", "QQQ", "DIA", "IWM", "VTI",
+
+  // Crypto
+  "BTC-USD", "ETH-USD", "SOL-USD",
+  "BNB-USD", "ADA-USD",
+]
+
 export function SearchBar({ onSearch }: SearchBarProps) {
   const [ticker, setTicker] = useState("")
 
   const handleSearch = () => {
-    const value = ticker.trim()
-    if (value) {
-      onSearch(value.toUpperCase())
-    }
+    const value = ticker.trim().toUpperCase()
+    if (!value) return
+
+    onSearch(value)
   }
 
   const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -26,57 +43,52 @@ export function SearchBar({ onSearch }: SearchBarProps) {
     }
   }
 
-  const quickTickers = ["BTC-USD", "NVDA", "TSLA", "SPY"]
-
   return (
-    <Card className="bg-slate-900/40 border-slate-800 px-4 py-3">
-      <div className="flex flex-col gap-3">
-        {/* Command Input */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-          <Input
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value.toUpperCase())}
-            onKeyDown={handleKeyPress}
-            placeholder="Enter ticker symbol (e.g. BTC-USD, NVDA)"
-            className="pl-9 h-11 bg-slate-950 border-slate-700 text-slate-50 placeholder:text-slate-500 font-mono text-base"
-          />
+    <Card className="bg-slate-900/50 border-slate-800 p-4 md:p-5 space-y-4">
+      {/* Input */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
 
-          {/* Inline action hint */}
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-mono text-slate-500">
-            Enter ↵
+        <Input
+          value={ticker}
+          onChange={(e) => setTicker(e.target.value.toUpperCase())}
+          onKeyDown={handleKeyPress}
+          placeholder="Search supported ticker (e.g. AAPL, BTC-USD)"
+          className="pl-9 pr-28 h-11 bg-slate-950 border-slate-700 text-slate-50 placeholder:text-slate-500 font-mono text-sm"
+        />
+
+        <Button
+          onClick={handleSearch}
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 px-3 bg-emerald-600 hover:bg-emerald-500 text-slate-50 font-mono text-xs"
+        >
+          Analyze
+          <CornerDownLeft className="ml-1 h-3 w-3" />
+        </Button>
+      </div>
+
+      {/* Scope + Supported tickers */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500">
+          <Info className="h-3 w-3" />
+          <span>
+            Supports US stocks, ETFs, and crypto pairs (Alpha Vantage)
           </span>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center justify-between">
-          {/* Primary Action */}
-          <Button
-            onClick={handleSearch}
-            size="sm"
-            className="bg-emerald-600 hover:bg-emerald-500 text-slate-50 font-mono"
-          >
-            Analyze
-          </Button>
-
-          {/* Quick symbols */}
-          <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500">
-            <span>Quick:</span>
-            {quickTickers.map((quickTicker) => (
-              <Button
-                key={quickTicker}
-                size="xs"
-                variant="outline"
-                onClick={() => {
-                  setTicker(quickTicker)
-                  onSearch(quickTicker)
-                }}
-                className="h-6 px-2 bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-slate-200 font-mono"
-              >
-                {quickTicker}
-              </Button>
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-2">
+          {SUPPORTED_TICKERS.map((t) => (
+            <Badge
+              key={t}
+              variant="outline"
+              className="cursor-pointer border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-slate-200 font-mono text-[11px]"
+              onClick={() => {
+                setTicker(t)
+                onSearch(t)
+              }}
+            >
+              {t}
+            </Badge>
+          ))}
         </div>
       </div>
     </Card>
