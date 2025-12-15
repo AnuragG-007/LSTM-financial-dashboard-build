@@ -209,6 +209,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
     const rsi = computeRSI(prices);
     const macd = computeMACD(prices);
 
+    // Historical data
     const hist = history.map((p, i) => ({
       date: p.date,
       price: p.price,
@@ -217,27 +218,20 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       isPrediction: false,
     }));
 
+    // Prediction data - ENSURE forecast is explicitly set
     const pred = forecast.map((p) => ({
       date: p.date,
-      forecast: p.forecast,
-      upperBand: p.upper,
-      lowerBand: p.lower,
-      rangeBase: p.lower,
-      rangeTop: p.upper - p.lower,
+      forecast: Number(p.forecast), // Ensure it's a number
+      upperBand: Number(p.upper),
+      lowerBand: Number(p.lower),
+      rangeBase: Number(p.lower),
+      rangeTop: Number(p.upper) - Number(p.lower),
       isPrediction: true,
     }));
 
-    // CRITICAL: Add connection point with forecast value
+    // Connection: Add forecast to last historical point
     if (hist.length > 0 && pred.length > 0) {
-      const lastHistorical = hist[hist.length - 1];
-      const firstPrediction = pred[0];
-      
-      // Add forecast to last historical point equal to historical price
-      lastHistorical.forecast = lastHistorical.price;
-      
-      // Add forecast to first prediction point equal to first forecast value
-      // This ensures the line connects smoothly
-      firstPrediction.forecast = firstPrediction.forecast;
+      hist[hist.length - 1].forecast = hist[hist.length - 1].price;
     }
 
     return {
@@ -401,18 +395,6 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               connectNulls
             />
 
-            {/* Forecast Line (Cyan) - MUST be before bounds to ensure it renders */}
-            <Line
-              type="monotone"
-              dataKey="forecast"
-              stroke="#22d3ee"
-              strokeWidth={3}
-              strokeDasharray="5 5"
-              dot={{ fill: "#22d3ee", r: 5, strokeWidth: 2, stroke: "#164e63" }}
-              connectNulls={true}
-              activeDot={{ r: 7, strokeWidth: 2, stroke: "#164e63" }}
-            />
-
             {/* Lower Band (Red) */}
             {showBands && (
               <Line
@@ -438,6 +420,18 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
                 connectNulls
               />
             )}
+
+            {/* Forecast Line (Cyan) - RENDER LAST */}
+            <Line
+              type="monotone"
+              dataKey="forecast"
+              stroke="#22d3ee"
+              strokeWidth={3}
+              strokeDasharray="5 5"
+              dot={{ fill: "#22d3ee", r: 5, strokeWidth: 2, stroke: "#164e63" }}
+              connectNulls
+              activeDot={{ r: 7, strokeWidth: 2, stroke: "#164e63" }}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
