@@ -55,12 +55,13 @@ export function PriceChart({ data, loading = false, onForecastChange }: PriceCha
       try {
         setFetching(true)
 
+        // ✅ UPDATED: Use NEXT_PUBLIC_API_URL
         const historyRes = await fetch(
-          `/api/price/history?ticker=${encodeURIComponent(data.ticker)}&days=60`,
+          `${process.env.NEXT_PUBLIC_API_URL}/api/price/history?ticker=${encodeURIComponent(data.ticker)}&days=60`,
           { signal: controller.signal },
         )
         const forecastRes = await fetch(
-          `/api/price/forecast?ticker=${encodeURIComponent(data.ticker)}&days=${forecastDays}`,
+          `${process.env.NEXT_PUBLIC_API_URL}/api/price/forecast?ticker=${encodeURIComponent(data.ticker)}&days=${forecastDays}`,
           { signal: controller.signal },
         )
 

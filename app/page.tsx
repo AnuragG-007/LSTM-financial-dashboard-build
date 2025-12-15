@@ -32,74 +32,29 @@ export default function QuantMindDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [forecastDays, setForecastDays] = useState(3)
 
-  // TODO: replace this mock with a real backend call
+  // ✅ REAL API CALL - No more mock data!
   const fetchPrediction = async (ticker: string) => {
     setLoading(true)
     setError(null)
     setPredictionData(null)
 
     try {
-      // simulate latency
-      await new Promise((resolve) => setTimeout(resolve, 800))
-
-      const basePrice = Math.random() * 500 + 50
-      const changePercent = Math.random() * 8 - 2 // -2% to +6%
-      const targetPrice = basePrice * (1 + changePercent / 100)
-
-      const historicalPrices = Array.from({ length: 60 }, (_, i) => {
-        const variance = Math.random() * 0.1 - 0.05
-        const price = basePrice * (1 + variance)
-        const date = new Date()
-        date.setDate(date.getDate() - (60 - i))
-
-        return {
-          date: date.toISOString().split("T")[0],
-          price: Math.round(price * 100) / 100,
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/prediction?ticker=${encodeURIComponent(ticker)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
         }
-      })
+      )
 
-      const forecastData = Array.from({ length: 7 }, (_, i) => {
-        const day = i + 1
-        const dayProgress = day / 7
-        const price = basePrice + (targetPrice - basePrice) * dayProgress
-        const changePct = ((price - basePrice) / basePrice) * 100
-
-        return {
-          day,
-          price: Math.round(price * 100) / 100,
-          changePct,
-        }
-      })
-
-      const mockData: PredictionData = {
-        ticker: ticker.toUpperCase(),
-        currentPrice: Math.round(basePrice * 100) / 100,
-        targetPrice: Math.round(targetPrice * 100) / 100,
-        predictedChange: changePercent,
-        signal:
-          changePercent > 1
-            ? "STRONG BUY"
-            : changePercent > 0
-            ? "BUY"
-            : changePercent < -1
-            ? "STRONG SELL"
-            : changePercent < 0
-            ? "SELL"
-            : "HOLD",
-        rsi: Math.random() * 100,
-        macd: Math.random() > 0.5 ? "Bullish" : "Bearish",
-        volatility:
-          Math.random() > 0.66
-            ? "High"
-            : Math.random() > 0.33
-            ? "Medium"
-            : "Low",
-        historicalPrices,
-        predictedPrice: Math.round(targetPrice * 100) / 100,
-        forecastData,
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`)
       }
 
-      setPredictionData(mockData)
+      const data = await response.json()
+      setPredictionData(data)
       setForecastDays(3)
     } catch (err) {
       setError(
