@@ -18,14 +18,23 @@ import { Toggle } from "@/components/ui/toggle"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ChevronUp, ChevronDown } from "lucide-react"
-import type { PredictionData } from "@/app/page"
 
 /* -----------------------------
    Types
 ----------------------------- */
-interface ChartPoint {
+interface PricePoint {
   date: string
   price: number
+}
+
+interface ForecastPoint {
+  date: string
+  price: number
+  lower: number
+  upper: number
+}
+
+interface ChartPoint extends PricePoint {
   lower?: number
   upper?: number
   rsi?: number
@@ -34,33 +43,32 @@ interface ChartPoint {
 }
 
 interface PriceChartProps {
-  data: PredictionData
-  loading?: boolean
+  ticker: string
   onForecastChange: (days: number) => void
 }
 
 /* -----------------------------
-   Helpers (deterministic)
+   Indicators (deterministic)
 ----------------------------- */
 function computeRSI(prices: number[], period = 14) {
   const rsi: number[] = []
-  let gains = 0
-  let losses = 0
+  let gain = 0
+  let loss = 0
 
   for (let i = 1; i <= period; i++) {
     const diff = prices[i] - prices[i - 1]
-    if (diff >= 0) gains += diff
-    else losses -= diff
+    if (diff >= 0) gain += diff
+    else loss -= diff
   }
 
-  let rs = gains / (losses || 1)
+  let rs = gain / (loss || 1)
   rsi[period] = 100 - 100 / (1 + rs)
 
   for (let i = period + 1; i < prices.length; i++) {
     const diff = prices[i] - prices[i - 1]
-    gains = (gains * (period - 1) + Math.max(diff, 0)) / period
-    losses = (losses * (period - 1) + Math.max(-diff, 0)) / period
-    rs = gains / (losses || 1)
+    gain = (gain * (period - 1) + Math.max(diff, 0)) / period
+    loss = (loss * (period - 1) + Math.max(-diff, 0)) / period
+    rs = gain / (loss || 1)
     rsi[i] = 100 - 100 / (1 + rs)
   }
 
@@ -70,7 +78,7 @@ function computeRSI(prices: number[], period = 14) {
 function computeMACD(prices: number[]) {
   const ema = (p: number[], span: number) => {
     const k = 2 / (span + 1)
-    const out: number[] = [p[0]]
+    const out = [p[0]]
     for (let i = 1; i < p.length; i++)
       out[i] = p[i] * k + out[i - 1] * (1 - k)
     return out
@@ -84,49 +92,80 @@ function computeMACD(prices: number[]) {
 /* -----------------------------
    Component
 ----------------------------- */
-export function PriceChart({
-  data,
-  loading = false,
-  onForecastChange,
-}: PriceChartProps) {
+export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
   const [forecastDays, setForecastDays] = useState(3)
   const [showBounds, setShowBounds] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [history, setHistory] = useState<PricePoint[]>([])
+  const [forecast, setForecast] = useState<ForecastPoint[]>([])
 
   useEffect(() => {
     onForecastChange(forecastDays)
   }, [forecastDays, onForecastChange])
 
   /* -----------------------------
-     Build chart data
+     Fetch data
+  ----------------------------- */
+  useEffect(() => {
+    let active = true
+
+    const load = async () => {
+      try {
+        setLoading(true)
+
+        const hRes = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/price/history?ticker=${ticker}&days=60`
+        )
+        const fRes = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/price/forecast?ticker=${ticker}&days=${forecastDays}`
+        )
+
+        if (!hRes.ok || !fRes.ok) throw new Error("Chart fetch failed")
+
+        const hJson = await hRes.json()
+        const fJson = await fRes.json()
+
+        if (active) {
+          setHistory(hJson.historicalPrices)
+          setForecast(fJson.points)
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        active && setLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      active = false
+    }
+  }, [ticker, forecastDays])
+
+  /* -----------------------------
+     Build chart
   ----------------------------- */
   const chartData: ChartPoint[] = useMemo(() => {
-    if (!data) return []
+    if (!history.length) return []
 
-    const prices = data.historicalPrices.map((p) => p.price)
+    const prices = history.map((p) => p.price)
     const rsi = computeRSI(prices)
     const macd = computeMACD(prices)
 
-    const historical: ChartPoint[] = data.historicalPrices.map((p, i) => ({
-      date: p.date,
-      price: p.price,
+    const hist: ChartPoint[] = history.map((p, i) => ({
+      ...p,
       rsi: rsi[i],
       macd: macd[i],
       isPrediction: false,
     }))
 
-    const forecast =
-      data.chart?.points
-        ?.slice(1, forecastDays + 1)
-        .map((p) => ({
-          date: p.date,
-          price: p.price,
-          lower: p.lower,
-          upper: p.upper,
-          isPrediction: true,
-        })) ?? []
+    const pred: ChartPoint[] = forecast.map((p) => ({
+      ...p,
+      isPrediction: true,
+    }))
 
-    return [...historical, ...forecast]
-  }, [data, forecastDays])
+    return [...hist, ...pred]
+  }, [history, forecast])
 
   if (loading || chartData.length === 0) {
     return (
@@ -141,14 +180,9 @@ export function PriceChart({
   ----------------------------- */
   return (
     <Card className="bg-slate-900/50 border-slate-800 p-6 space-y-6">
-      <div>
-        <h3 className="text-sm font-mono text-slate-400 uppercase">
-          Price Forecast
-        </h3>
-        <p className="text-xs text-slate-600 font-mono">
-          Historical + AI Prediction
-        </p>
-      </div>
+      <h3 className="text-sm font-mono text-slate-400 uppercase">
+        Price Forecast
+      </h3>
 
       {/* Horizon Control */}
       <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
@@ -166,15 +200,13 @@ export function PriceChart({
             <ChevronDown />
           </Button>
 
-          <div className="flex-1">
-            <Slider
-              min={1}
-              max={7}
-              step={1}
-              value={[forecastDays]}
-              onValueChange={(v) => setForecastDays(v[0])}
-            />
-          </div>
+          <Slider
+            min={1}
+            max={7}
+            step={1}
+            value={[forecastDays]}
+            onValueChange={(v) => setForecastDays(v[0])}
+          />
 
           <Button
             size="icon"
@@ -185,30 +217,27 @@ export function PriceChart({
             <ChevronUp />
           </Button>
 
-          <span className="w-12 text-center font-mono text-emerald-400">
+          <span className="font-mono text-emerald-400 w-10 text-center">
             {forecastDays}d
           </span>
         </div>
       </div>
 
-      {/* Toggles */}
-      <div className="flex gap-2">
-        <Toggle
-          pressed={showBounds}
-          onPressedChange={setShowBounds}
-          className="h-8 px-3 text-xs font-mono"
-        >
-          Confidence Bands
-        </Toggle>
-      </div>
+      <Toggle
+        pressed={showBounds}
+        onPressedChange={setShowBounds}
+        className="h-8 px-3 text-xs font-mono"
+      >
+        Confidence Bands
+      </Toggle>
 
-      {/* PRICE CHART */}
+      {/* PRICE */}
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-            <XAxis dataKey="date" stroke="#64748b" />
-            <YAxis stroke="#64748b" />
+            <XAxis dataKey="date" />
+            <YAxis />
             <Tooltip />
 
             {showBounds && (
@@ -218,12 +247,7 @@ export function PriceChart({
               </>
             )}
 
-            <Line
-              dataKey="price"
-              stroke="#10b981"
-              strokeWidth={2}
-              dot={false}
-            />
+            <Line dataKey="price" stroke="#10b981" dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -232,7 +256,6 @@ export function PriceChart({
       <div className="h-32">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData}>
-            <XAxis dataKey="date" hide />
             <YAxis domain={[0, 100]} />
             <Line dataKey="rsi" stroke="#38bdf8" dot={false} />
           </ComposedChart>
@@ -243,7 +266,6 @@ export function PriceChart({
       <div className="h-32">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData}>
-            <XAxis dataKey="date" hide />
             <YAxis />
             <Line dataKey="macd" stroke="#facc15" dot={false} />
           </ComposedChart>

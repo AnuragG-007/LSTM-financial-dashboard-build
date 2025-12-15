@@ -17,64 +17,44 @@ export type PredictionData = {
   predictedChange: number
   signal: "BUY" | "SELL" | "HOLD" | "STRONG BUY" | "STRONG SELL"
   rsi: number
-  macd: string
+  macd: "Bullish" | "Bearish"
   volatility: "Low" | "Medium" | "High"
-  historicalPrices: Array<{ date: string; price: number }>
+  historicalPrices: { date: string; price: number }[]
   predictedPrice: number
-  forecastData: Array<{ day: number; price: number; changePct: number }>
-  chart: {
-    points: Array<{
-      date: string
-      price: number
-      lower: number
-      upper: number
-    }>
-  }
+  forecastData: { day: number; price: number; changePct: number }[]
 }
 
 export default function QuantMindDashboard() {
   const [data, setData] = useState<PredictionData | null>(null)
-  const [ticker, setTicker] = useState<string | null>(null)
-  const [forecastDays, setForecastDays] = useState(3)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [forecastDays, setForecastDays] = useState(3)
 
-  const fetchPrediction = async (t: string, days = forecastDays) => {
+  const fetchPrediction = async (ticker: string) => {
     setLoading(true)
     setError(null)
-    setTicker(t)
+    setData(null)
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/prediction/full?ticker=${encodeURIComponent(
-          t,
-        )}&days=${days}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/prediction?ticker=${ticker}`
       )
 
-      if (!res.ok) {
-        throw new Error(`API error ${res.status}`)
-      }
+      if (!res.ok) throw new Error(`API error ${res.status}`)
 
       const json = await res.json()
       setData(json)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch")
+    } catch (e: any) {
+      setError(e.message ?? "Failed to fetch prediction")
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleForecastChange = (days: number) => {
-    setForecastDays(days)
-    if (ticker) {
-      fetchPrediction(ticker, days)
     }
   }
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        <SearchBar onSearch={(t) => fetchPrediction(t, forecastDays)} />
+        <SearchBar onSearch={fetchPrediction} />
 
         {error && (
           <Alert variant="destructive">
@@ -85,27 +65,29 @@ export default function QuantMindDashboard() {
 
         {loading && (
           <>
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-80 w-full" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-80" />
           </>
         )}
 
-        {data && !loading && (
+        {data && (
           <>
             <HeadsUpDisplay data={data} forecastDays={forecastDays} />
             <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
               <PriceChart
+                ticker={data.ticker}
+                onForecastChange={setForecastDays}
+              />
+              <ProfitSimulator
                 data={data}
                 forecastDays={forecastDays}
-                onForecastChange={handleForecastChange}
               />
-              <ProfitSimulator data={data} forecastDays={forecastDays} />
             </div>
           </>
         )}
 
         {!data && !loading && !error && (
-          <Card className="p-6">
+          <Card className="p-6 text-slate-400 font-mono">
             Enter a ticker to begin analysis.
           </Card>
         )}
