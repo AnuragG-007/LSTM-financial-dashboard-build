@@ -41,6 +41,8 @@ interface ChartPoint {
   forecast?: number;
   upperBand?: number;
   lowerBand?: number;
+  rangeBase?: number;
+  rangeTop?: number;
   rsi?: number;
   macd?: number;
   isPrediction: boolean;
@@ -102,7 +104,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
   const seen = new Set();
   const uniquePayload = payload.filter((entry: any) => {
-    if (!entry.value) return false;
+    if (
+      !entry.value ||
+      entry.dataKey === "rangeBase" ||
+      entry.dataKey === "rangeTop"
+    )
+      return false;
     if (seen.has(entry.dataKey)) return false;
     seen.add(entry.dataKey);
     return true;
@@ -219,6 +226,8 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       forecast: Number(p.price),
       upperBand: Number(p.upper),
       lowerBand: Number(p.lower),
+      rangeBase: Number(p.lower),
+      rangeTop: Number(p.upper) - Number(p.lower),
       isPrediction: true,
     }));
 
@@ -316,9 +325,9 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
         <ResponsiveContainer>
           <ComposedChart data={chartData}>
             <defs>
-              <linearGradient id="colorBand" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#22c55e" stopOpacity={0.4} />
-                <stop offset="100%" stopColor="#ef4444" stopOpacity={0.15} />
+              <linearGradient id="colorConfidence" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#22c55e" stopOpacity={0.35} />
+                <stop offset="100%" stopColor="#ef4444" stopOpacity={0.2} />
               </linearGradient>
             </defs>
 
@@ -355,19 +364,26 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
             {/* Shaded confidence band between lowerBand and upperBand */}
             {showBands && (
-              <Area
-                type="monotone"
-                dataKey="upperBand"
-                stroke="none"
-                fill="url(#colorBand)"
-                fillOpacity={0.35}
-                connectNulls
-                baseLine={(data: any[]) =>
-                  data.map((d) =>
-                    typeof d.lowerBand === "number" ? d.lowerBand : d.upperBand
-                  )
-                }
-              />
+              <>
+                {/* Transparent base at lowerBand */}
+                <Area
+                  type="monotone"
+                  dataKey="rangeBase"
+                  stackId="confidence"
+                  stroke="none"
+                  fill="transparent"
+                  connectNulls
+                />
+                {/* Visible band = upper - lower */}
+                <Area
+                  type="monotone"
+                  dataKey="rangeTop"
+                  stackId="confidence"
+                  stroke="none"
+                  fill="url(#colorConfidence)"
+                  connectNulls
+                />
+              </>
             )}
 
             <Line
