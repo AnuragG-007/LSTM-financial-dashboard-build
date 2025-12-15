@@ -10,6 +10,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceLine,
+  Legend,
 } from "recharts"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -34,12 +36,14 @@ interface ForecastPoint {
   upper: number
 }
 
-interface ChartPoint extends PricePoint {
+interface ChartPoint {
+  date: string
+  price?: number
+  forecast?: number
   lower?: number
   upper?: number
   rsi?: number
   macd?: number
-  isPrediction: boolean
 }
 
 interface PriceChartProps {
@@ -48,7 +52,7 @@ interface PriceChartProps {
 }
 
 /* -----------------------------
-   Indicators (deterministic)
+   Indicators
 ----------------------------- */
 function computeRSI(prices: number[], period = 14) {
   const rsi: number[] = []
@@ -57,8 +61,7 @@ function computeRSI(prices: number[], period = 14) {
 
   for (let i = 1; i <= period; i++) {
     const diff = prices[i] - prices[i - 1]
-    if (diff >= 0) gain += diff
-    else loss -= diff
+    diff >= 0 ? (gain += diff) : (loss -= diff)
   }
 
   let rs = gain / (loss || 1)
@@ -143,7 +146,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
   }, [ticker, forecastDays])
 
   /* -----------------------------
-     Build chart
+     Build chart data
   ----------------------------- */
   const chartData: ChartPoint[] = useMemo(() => {
     if (!history.length) return []
@@ -153,24 +156,28 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
     const macd = computeMACD(prices)
 
     const hist: ChartPoint[] = history.map((p, i) => ({
-      ...p,
+      date: p.date,
+      price: p.price,
       rsi: rsi[i],
       macd: macd[i],
-      isPrediction: false,
     }))
 
     const pred: ChartPoint[] = forecast.map((p) => ({
-      ...p,
-      isPrediction: true,
+      date: p.date,
+      forecast: p.price,
+      lower: p.lower,
+      upper: p.upper,
     }))
 
     return [...hist, ...pred]
   }, [history, forecast])
 
+  const forecastStartDate = history.at(-1)?.date
+
   if (loading || chartData.length === 0) {
     return (
       <Card className="bg-slate-900/50 border-slate-800 p-6">
-        <Skeleton className="h-80 w-full bg-slate-800" />
+        <Skeleton className="h-[520px] w-full bg-slate-800/60" />
       </Card>
     )
   }
@@ -180,13 +187,19 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
   ----------------------------- */
   return (
     <Card className="bg-slate-900/50 border-slate-800 p-6 space-y-6">
-      <h3 className="text-sm font-mono text-slate-400 uppercase">
-        Price Forecast
-      </h3>
+      {/* Header */}
+      <div>
+        <h3 className="text-sm font-mono text-slate-400 uppercase">
+          Price Forecast
+        </h3>
+        <p className="text-xs font-mono text-slate-500">
+          Historical prices with AI-predicted continuation
+        </p>
+      </div>
 
       {/* Horizon Control */}
-      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-        <Label className="font-mono text-slate-300 mb-2 block">
+      <div className="rounded-lg border border-slate-800 bg-slate-900 p-4 space-y-3">
+        <Label className="font-mono text-slate-300">
           Prediction Horizon
         </Label>
 
@@ -217,7 +230,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
             <ChevronUp />
           </Button>
 
-          <span className="font-mono text-emerald-400 w-10 text-center">
+          <span className="w-10 text-center font-mono text-emerald-400">
             {forecastDays}d
           </span>
         </div>
@@ -231,32 +244,99 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
         Confidence Bands
       </Toggle>
 
-      {/* PRICE */}
+      {/* PRICE CHART */}
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip />
+            <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
 
-            {showBounds && (
-              <>
-                <Area dataKey="upper" fill="#10b981" opacity={0.15} />
-                <Area dataKey="lower" fill="#10b981" opacity={0.15} />
-              </>
+            <XAxis
+              dataKey="date"
+              tick={{ fill: "#94a3b8", fontSize: 11 }}
+              tickFormatter={(v) => v.slice(5)}
+            />
+
+            <YAxis
+              tick={{ fill: "#94a3b8", fontSize: 11 }}
+              tickFormatter={(v) => `$${v}`}
+            />
+
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "#020617",
+                borderColor: "#334155",
+                fontFamily: "monospace",
+                fontSize: 12,
+              }}
+            />
+
+            <Legend />
+
+            {/* Forecast marker */}
+            {forecastStartDate && (
+              <ReferenceLine
+                x={forecastStartDate}
+                stroke="#64748b"
+                strokeDasharray="4 4"
+                label={{
+                  value: "Forecast",
+                  position: "top",
+                  fill: "#94a3b8",
+                  fontSize: 11,
+                }}
+              />
             )}
 
-            <Line dataKey="price" stroke="#10b981" dot={false} />
+            {showBounds && (
+              <Area
+                dataKey="upper"
+                fill="#10b981"
+                fillOpacity={0.08}
+                stroke="none"
+              />
+            )}
+
+            {showBounds && (
+              <Area
+                dataKey="lower"
+                fill="#10b981"
+                fillOpacity={0.08}
+                stroke="none"
+              />
+            )}
+
+            {/* Historical */}
+            <Line
+              dataKey="price"
+              name="Historical"
+              stroke="#10b981"
+              strokeWidth={2}
+              dot={false}
+            />
+
+            {/* Forecast */}
+            <Line
+              dataKey="forecast"
+              name="Forecast"
+              stroke="#10b981"
+              strokeDasharray="6 6"
+              strokeWidth={2}
+              dot={false}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
       {/* RSI */}
       <div className="h-32">
+        <p className="text-xs font-mono text-slate-400 mb-1">
+          Relative Strength Index (RSI)
+        </p>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData}>
-            <YAxis domain={[0, 100]} />
+            <YAxis domain={[0, 100]} hide />
+            <ReferenceLine y={70} stroke="#475569" strokeDasharray="3 3" />
+            <ReferenceLine y={30} stroke="#475569" strokeDasharray="3 3" />
             <Line dataKey="rsi" stroke="#38bdf8" dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
@@ -264,9 +344,13 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
       {/* MACD */}
       <div className="h-32">
+        <p className="text-xs font-mono text-slate-400 mb-1">
+          MACD
+        </p>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData}>
-            <YAxis />
+            <YAxis hide />
+            <ReferenceLine y={0} stroke="#475569" />
             <Line dataKey="macd" stroke="#facc15" dot={false} />
           </ComposedChart>
         </ResponsiveContainer>

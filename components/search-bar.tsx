@@ -29,28 +29,38 @@ export function SearchBar({ onSearch }: SearchBarProps) {
   const quickTickers = ["BTC-USD", "NVDA", "TSLA", "SPY"]
 
   return (
-    <Card className="bg-slate-900/50 border-slate-800 p-4 md:p-6">
+    <Card className="bg-slate-900/40 border-slate-800 px-4 py-3">
       <div className="flex flex-col gap-3">
+        {/* Command Input */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
           <Input
             value={ticker}
             onChange={(e) => setTicker(e.target.value.toUpperCase())}
-            onKeyPress={handleKeyPress}
-            placeholder="Enter ticker (e.g. BTC-USD)"
-            className="pl-10 bg-slate-900 border-slate-700 text-slate-50 placeholder:text-slate-500 font-mono text-lg h-12 md:h-14"
+            onKeyDown={handleKeyPress}
+            placeholder="Enter ticker symbol (e.g. BTC-USD, NVDA)"
+            className="pl-9 h-11 bg-slate-950 border-slate-700 text-slate-50 placeholder:text-slate-500 font-mono text-base"
           />
+
+          {/* Inline action hint */}
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-mono text-slate-500">
+            Enter ↵
+          </span>
         </div>
 
-        <div className="flex items-center justify-between gap-2">
+        {/* Actions */}
+        <div className="flex items-center justify-between">
+          {/* Primary Action */}
           <Button
             onClick={handleSearch}
+            size="sm"
             className="bg-emerald-600 hover:bg-emerald-500 text-slate-50 font-mono"
           >
             Analyze
           </Button>
 
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
+          {/* Quick symbols */}
+          <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500">
             <span>Quick:</span>
             {quickTickers.map((quickTicker) => (
               <Button
@@ -61,7 +71,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
                   setTicker(quickTicker)
                   onSearch(quickTicker)
                 }}
-                className="bg-slate-800/50 border-slate-700 hover:bg-slate-700 hover:border-slate-600 text-slate-300 font-mono text-xs"
+                className="h-6 px-2 bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-slate-200 font-mono"
               >
                 {quickTicker}
               </Button>

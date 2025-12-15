@@ -53,9 +53,11 @@ export default function QuantMindDashboard() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+      <div className="mx-auto max-w-6xl px-4 py-6 space-y-6">
+        {/* Command / Search */}
         <SearchBar onSearch={fetchPrediction} />
 
+        {/* Error */}
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -63,32 +65,49 @@ export default function QuantMindDashboard() {
           </Alert>
         )}
 
+        {/* Loading */}
         {loading && (
-          <>
-            <Skeleton className="h-32" />
-            <Skeleton className="h-80" />
-          </>
+          <div className="space-y-4">
+            <Skeleton className="h-28 bg-slate-800/60" />
+            <Skeleton className="h-96 bg-slate-800/60" />
+          </div>
         )}
 
-        {data && (
-          <>
+        {/* Main Content */}
+        {data && !loading && (
+          <div className="space-y-6">
+            {/* Decision summary */}
             <HeadsUpDisplay data={data} forecastDays={forecastDays} />
-            <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+
+            {/* Chart + Tools */}
+            <div className="grid gap-6 lg:grid-cols-[2.2fr_1fr]">
+              {/* Primary: Price & Forecast */}
               <PriceChart
                 ticker={data.ticker}
                 onForecastChange={setForecastDays}
               />
+
+              {/* Secondary: Simulation */}
               <ProfitSimulator
                 data={data}
                 forecastDays={forecastDays}
               />
             </div>
-          </>
+          </div>
         )}
 
+        {/* Empty State */}
         {!data && !loading && !error && (
-          <Card className="p-6 text-slate-400 font-mono">
-            Enter a ticker to begin analysis.
+          <Card className="border border-dashed border-slate-800 bg-slate-900/40 p-8">
+            <div className="text-center space-y-2">
+              <p className="font-mono text-slate-300">
+                Market intelligence ready
+              </p>
+              <p className="text-xs font-mono text-slate-500">
+                Enter a ticker above to generate AI-powered forecasts and risk
+                metrics
+              </p>
+            </div>
           </Card>
         )}
       </div>

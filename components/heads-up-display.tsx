@@ -33,25 +33,26 @@ export function HeadsUpDisplay({
   const [copied, setCopied] = useState(false)
 
   /* -----------------------------
-     Derived (single source of truth)
+     Derived view (single source of truth)
   ----------------------------- */
   const view = useMemo(() => {
     const forecastPoint =
-      data.forecastData[Math.min(forecastDays - 1, data.forecastData.length - 1)]
+      data.forecastData[
+        Math.min(forecastDays - 1, data.forecastData.length - 1)
+      ]
 
     const targetPrice = forecastPoint?.price ?? data.targetPrice
     const priceChangePct =
       ((targetPrice - data.currentPrice) / data.currentPrice) * 100
 
-    const isBullish = priceChangePct > 0
+    const isBullish = priceChangePct >= 0
 
-    // Horizon-based confidence (standard quant heuristic)
     const confidence =
       forecastDays <= 2
-        ? { label: "High", color: "emerald" }
+        ? "High"
         : forecastDays <= 5
-        ? { label: "Medium", color: "amber" }
-        : { label: "Low", color: "rose" }
+        ? "Medium"
+        : "Low"
 
     return {
       targetPrice,
@@ -75,16 +76,29 @@ Change: ${view.priceChangePct.toFixed(2)}%`
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const signalColor =
+    data.signal.includes("BUY")
+      ? "emerald"
+      : data.signal.includes("SELL")
+      ? "rose"
+      : "amber"
+
   /* -----------------------------
      Render
   ----------------------------- */
   return (
-    <div className="space-y-4">
+    <Card className="bg-slate-900/50 border-slate-800 p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-mono text-slate-400 uppercase tracking-wide">
-          Market Intelligence • {data.ticker}
-        </h2>
+        <div>
+          <h2 className="text-sm font-mono text-slate-400 uppercase tracking-wide">
+            Market Intelligence
+          </h2>
+          <p className="font-mono text-slate-200 text-lg">
+            {data.ticker}
+          </p>
+        </div>
+
         <Button
           size="sm"
           variant="outline"
@@ -105,33 +119,44 @@ Change: ${view.priceChangePct.toFixed(2)}%`
         </Button>
       </div>
 
-      {/* Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {/* SIGNAL */}
-        <Card className="bg-slate-900/60 border-slate-800 p-6">
-          <h3 className="text-xs font-mono text-slate-400 uppercase mb-4">
+      {/* Main Grid */}
+      <div className="grid gap-6 md:grid-cols-[1.3fr_1fr_1fr]">
+        {/* SIGNAL (dominant) */}
+        <div className="flex flex-col justify-center rounded-lg border border-slate-800 bg-slate-900/60 p-6">
+          <span className="text-xs font-mono text-slate-500 uppercase mb-2">
             AI Signal
-          </h3>
-          <div className="flex justify-center">
-            <Badge
-              className={`text-2xl font-mono px-6 py-3 ${
-                data.signal.includes("BUY")
-                  ? "bg-emerald-600 text-white"
-                  : data.signal.includes("SELL")
-                  ? "bg-rose-600 text-white"
-                  : "bg-amber-600 text-white"
+          </span>
+
+          <span
+            className={`text-4xl font-mono font-bold tracking-wide text-${signalColor}-500`}
+          >
+            {data.signal}
+          </span>
+
+          <div className="mt-4 flex items-center gap-2">
+            {view.isBullish ? (
+              <TrendingUp className="h-5 w-5 text-emerald-500" />
+            ) : (
+              <TrendingDown className="h-5 w-5 text-rose-500" />
+            )}
+            <span
+              className={`text-xl font-mono font-bold ${
+                view.isBullish ? "text-emerald-500" : "text-rose-500"
               }`}
             >
-              {data.signal}
-            </Badge>
+              {view.priceChangePct.toFixed(2)}%
+            </span>
+            <span className="text-xs font-mono text-slate-500">
+              ({forecastDays}D)
+            </span>
           </div>
-        </Card>
+        </div>
 
         {/* PRICE ACTION */}
-        <Card className="bg-slate-900/60 border-slate-800 p-6 space-y-4">
+        <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-6 space-y-4">
           <h3 className="text-xs font-mono text-slate-400 uppercase flex items-center gap-2">
             <Target className="h-4 w-4" />
-            Price Action
+            Price
           </h3>
 
           <div>
@@ -149,34 +174,19 @@ Change: ${view.priceChangePct.toFixed(2)}%`
               ${view.targetPrice.toFixed(2)}
             </p>
           </div>
-
-          <div className="flex items-center gap-2">
-            {view.isBullish ? (
-              <TrendingUp className="text-emerald-500" />
-            ) : (
-              <TrendingDown className="text-rose-500" />
-            )}
-            <span
-              className={`text-xl font-mono font-bold ${
-                view.isBullish ? "text-emerald-500" : "text-rose-500"
-              }`}
-            >
-              {view.priceChangePct.toFixed(2)}%
-            </span>
-          </div>
-        </Card>
+        </div>
 
         {/* AI METRICS */}
-        <Card className="bg-slate-900/60 border-slate-800 p-6 space-y-4">
+        <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-6 space-y-4">
           <h3 className="text-xs font-mono text-slate-400 uppercase flex items-center gap-2">
             <Brain className="h-4 w-4" />
-            AI Metrics
+            Indicators
           </h3>
 
           {/* RSI */}
           <div>
             <div className="flex justify-between text-xs font-mono mb-1">
-              <span>RSI</span>
+              <span className="text-slate-500">RSI</span>
               <span>{data.rsi.toFixed(1)}</span>
             </div>
             <Progress
@@ -214,13 +224,19 @@ Change: ${view.priceChangePct.toFixed(2)}%`
             </span>
             <Badge
               variant="outline"
-              className={`border-${view.confidence.color}-500 text-${view.confidence.color}-500`}
+              className={
+                view.confidence === "High"
+                  ? "border-emerald-500 text-emerald-500"
+                  : view.confidence === "Medium"
+                  ? "border-amber-500 text-amber-500"
+                  : "border-rose-500 text-rose-500"
+              }
             >
-              {view.confidence.label}
+              {view.confidence}
             </Badge>
           </div>
-        </Card>
+        </div>
       </div>
-    </div>
+    </Card>
   )
 }

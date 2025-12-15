@@ -3,60 +3,93 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ======================================================
+   QuantMind – Financial Terminal Theme
+   ====================================================== */
 
 :root {
-  /* Core surfaces */
+  /* --------------------------------------------------
+     Core Surfaces (very calm, terminal-like)
+  -------------------------------------------------- */
   --background: oklch(0.045 0 0);        /* Near-black */
-  --foreground: oklch(0.96 0 0);
+  --foreground: oklch(0.94 0 0);
 
-  --card: oklch(0.06 0 0);
-  --card-foreground: oklch(0.96 0 0);
+  --card: oklch(0.058 0 0);
+  --card-foreground: oklch(0.94 0 0);
 
-  --popover: oklch(0.07 0 0);
-  --popover-foreground: oklch(0.96 0 0);
+  --popover: oklch(0.065 0 0);
+  --popover-foreground: oklch(0.94 0 0);
 
-  /* Borders & structure */
-  --border: oklch(0.18 0 0);
-  --input: oklch(0.18 0 0);
-  --ring: oklch(0.55 0 0);
+  /* --------------------------------------------------
+     Structure & Borders (low-contrast)
+  -------------------------------------------------- */
+  --border: oklch(0.20 0 0);
+  --input: oklch(0.20 0 0);
+  --ring: oklch(0.65 0 0);
 
-  /* Neutral UI */
-  --secondary: oklch(0.14 0 0);
-  --secondary-foreground: oklch(0.94 0 0);
+  /* --------------------------------------------------
+     Neutral UI (labels, captions, secondary text)
+  -------------------------------------------------- */
+  --secondary: oklch(0.13 0 0);
+  --secondary-foreground: oklch(0.88 0 0);
 
-  --muted: oklch(0.12 0 0);
+  --muted: oklch(0.11 0 0);
   --muted-foreground: oklch(0.62 0 0);
 
   --accent: oklch(0.14 0 0);
-  --accent-foreground: oklch(0.94 0 0);
+  --accent-foreground: oklch(0.90 0 0);
 
-  /* Semantic signals */
-  --primary: oklch(0.72 0.18 160);       /* Uptrend / Buy */
+  /* --------------------------------------------------
+     Semantic Signals (VERY important)
+  -------------------------------------------------- */
+
+  /* BUY / Uptrend */
+  --primary: oklch(0.72 0.17 160);
   --primary-foreground: oklch(0.08 0 0);
 
-  --destructive: oklch(0.63 0.22 25);    /* Downtrend / Risk */
+  /* SELL / Risk */
+  --destructive: oklch(0.62 0.22 25);
   --destructive-foreground: oklch(0.97 0 0);
 
-  /* Charts (semantic, not decorative) */
-  --chart-1: oklch(0.72 0.18 160);        /* Price / Up */
-  --chart-2: oklch(0.63 0.22 25);         /* Down / Drawdown */
-  --chart-3: oklch(0.76 0.18 85);         /* RSI */
-  --chart-4: oklch(0.68 0.17 250);        /* MACD */
-  --chart-5: oklch(0.65 0.05 0);          /* Neutral / MA */
+  /* --------------------------------------------------
+     Chart Palette (financial semantics)
+  -------------------------------------------------- */
 
+  /* Price (Uptrend / Neutral bullish) */
+  --chart-1: oklch(0.72 0.17 160);
+
+  /* Price (Downtrend / Drawdown) */
+  --chart-2: oklch(0.62 0.22 25);
+
+  /* RSI (Momentum – cyan/blue) */
+  --chart-3: oklch(0.75 0.14 220);
+
+  /* MACD (Signal – amber/yellow) */
+  --chart-4: oklch(0.78 0.17 85);
+
+  /* Moving Average / Neutral reference */
+  --chart-5: oklch(0.65 0.05 0);
+
+  /* --------------------------------------------------
+     Radius & Layout
+  -------------------------------------------------- */
   --radius: 0.5rem;
 
+  /* Optional sidebar tokens (future-proofing) */
   --sidebar: oklch(0.055 0 0);
-  --sidebar-foreground: oklch(0.94 0 0);
+  --sidebar-foreground: oklch(0.90 0 0);
   --sidebar-border: oklch(0.18 0 0);
   --sidebar-ring: oklch(0.55 0 0);
 }
 
 .dark {
   --background: oklch(0.045 0 0);
-  --foreground: oklch(0.96 0 0);
+  --foreground: oklch(0.94 0 0);
 }
 
+/* ======================================================
+   Tailwind Theme Mapping
+   ====================================================== */
 
 @theme inline {
   --font-sans: "Geist", "Geist Fallback";
@@ -101,10 +134,13 @@
   --radius-lg: calc(var(--radius) + 2px);
 }
 
+/* ======================================================
+   Base Layer – Global Restraint
+   ====================================================== */
 
 @layer base {
   * {
-    @apply border-border outline-ring/40;
+    @apply border-border/50 outline-ring/40;
   }
 
   body {
@@ -112,16 +148,17 @@
   }
 
   ::selection {
-    background: color-mix(in oklch, var(--primary) 30%, transparent);
+    background: color-mix(in oklch, var(--primary) 28%, transparent);
   }
 
+  /* Scrollbars – subtle, terminal-like */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: color-mix(in oklch, var(--muted) 60%, transparent);
+    background: color-mix(in oklch, var(--muted) 55%, transparent);
     border-radius: 6px;
   }
 }
