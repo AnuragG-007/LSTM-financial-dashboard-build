@@ -101,6 +101,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   const dataPoint = payload[0]?.payload;
   const isPrediction = dataPoint?.isPrediction;
 
+  // Filter out confidence band and duplicates
   const seen = new Set();
   const uniquePayload = payload.filter((entry: any) => {
     if (!entry.value || entry.dataKey === "confidenceBand") return false;
@@ -109,11 +110,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return true;
   });
 
+  // Custom sort order
   const sortOrder: Record<string, number> = {
-    forecast: 0,
-    upperBand: 1,
-    lowerBand: 2,
-    price: 3,
+    price: 0, // Historical price first
+    forecast: 1, // Forecast second
+    upperBand: 2, // Upper bound third
+    lowerBand: 3, // Lower bound fourth
   };
 
   const sortedPayload = uniquePayload.sort((a: any, b: any) => {
@@ -129,10 +131,23 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         let displayLabel = entry.name;
         let color = entry.color;
 
-        if (entry.dataKey === "upperBand") displayLabel = "Upper Bound";
-        if (entry.dataKey === "lowerBand") displayLabel = "Lower Bound";
-        if (entry.dataKey === "forecast") displayLabel = "Forecast";
-        if (entry.dataKey === "price") displayLabel = "Price";
+        // Customize labels for clarity
+        if (entry.dataKey === "upperBand") {
+          displayLabel = "Upper Bound";
+          color = "#10b981";
+        }
+        if (entry.dataKey === "lowerBand") {
+          displayLabel = "Lower Bound";
+          color = "#ef4444";
+        }
+        if (entry.dataKey === "forecast") {
+          displayLabel = "Forecast";
+          color = "#22d3ee";
+        }
+        if (entry.dataKey === "price") {
+          displayLabel = isPrediction ? "Price (Actual)" : "Price";
+          color = "#facc15";
+        }
 
         return (
           <div key={index} className="flex items-center justify-between gap-4">
@@ -218,20 +233,21 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
     const pred: ChartPoint[] = forecast.map((p) => ({
       date: p.date,
-      forecast: Number(p.price),
+      forecast: Number(p.price), // Backend's "price" field = predicted price
       upperBand: Number(p.upper),
       lowerBand: Number(p.lower),
       confidenceBand: [Number(p.lower), Number(p.upper)] as [number, number],
       isPrediction: true,
     }));
 
+    // Connect historical to forecast by adding forecast value to last historical point
     if (hist.length > 0 && pred.length > 0) {
       hist[hist.length - 1].forecast = hist[hist.length - 1].price;
     }
 
     const allData = [...hist, ...pred];
 
-    // Generate evenly spaced X-axis ticks (show ~25 dates)
+    // Generate evenly spaced X-axis ticks (~25 dates)
     const tickInterval = Math.ceil(allData.length / 25);
     const ticks = allData
       .filter((_, i) => i % tickInterval === 0)
@@ -337,7 +353,15 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               </linearGradient>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+            {/* Grid aligned with axis ticks */}
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#1e293b"
+              verticalPoints={xAxisTicks.map((tick) =>
+                chartData.findIndex((d) => d.date === tick)
+              )}
+            />
+
             <XAxis
               dataKey="date"
               ticks={xAxisTicks}
@@ -465,15 +489,6 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               stroke="#1e293b"
               vertical={false}
             />
-            <XAxis
-              dataKey="date"
-              ticks={xAxisTicks}
-              tick={{ fill: "#64748b", fontSize: 10 }}
-              tickFormatter={(value) => {
-                const date = new Date(value);
-                return `${date.getMonth() + 1}/${date.getDate()}`;
-              }}
-            />
             <YAxis
               domain={[0, 100]}
               tick={{ fill: "#64748b", fontSize: 11 }}
@@ -516,15 +531,6 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               strokeDasharray="3 3"
               stroke="#1e293b"
               vertical={false}
-            />
-            <XAxis
-              dataKey="date"
-              ticks={xAxisTicks}
-              tick={{ fill: "#64748b", fontSize: 10 }}
-              tickFormatter={(value) => {
-                const date = new Date(value);
-                return `${date.getMonth() + 1}/${date.getDate()}`;
-              }}
             />
             <YAxis tick={{ fill: "#64748b", fontSize: 11 }} tickCount={5} />
             <ReferenceLine y={0} stroke="#64748b" />
