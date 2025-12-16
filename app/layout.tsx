@@ -68,7 +68,7 @@ export default function RootLayout({
             {/* Navigation */}
             <div className="flex items-center gap-3">
               <Link
-                href="/metrics-info"
+                href="/metric-info"
                 className="flex items-center gap-2 rounded-lg border border-slate-700/50 bg-slate-800/30 px-3 py-1.5 text-xs font-mono text-slate-300 hover:border-emerald-500/50 hover:bg-slate-800/50 hover:text-emerald-400 transition-all"
               >
                 <Info className="h-3.5 w-3.5" />
