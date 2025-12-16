@@ -41,7 +41,7 @@ interface ChartPoint {
   forecast?: number;
   upperBand?: number;
   lowerBand?: number;
-  confidenceBand?: [number, number]; // <-- used for shading
+  confidenceBand?: [number, number];
   rsi?: number;
   macd?: number;
   isPrediction: boolean;
@@ -103,7 +103,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
   const seen = new Set();
   const uniquePayload = payload.filter((entry: any) => {
-    if (!entry.value || entry.dataKey === "confidenceBand") return false; // exclude shading band
+    if (!entry.value || entry.dataKey === "confidenceBand") return false;
     if (seen.has(entry.dataKey)) return false;
     seen.add(entry.dataKey);
     return true;
@@ -200,8 +200,9 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
     };
   }, [ticker, forecastDays]);
 
-  const { chartData, predictionStartDate } = useMemo(() => {
-    if (!history.length) return { chartData: [], predictionStartDate: null };
+  const { chartData, predictionStartDate, xAxisTicks } = useMemo(() => {
+    if (!history.length)
+      return { chartData: [], predictionStartDate: null, xAxisTicks: [] };
 
     const prices = history.map((p) => p.price);
     const rsi = computeRSI(prices);
@@ -220,7 +221,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       forecast: Number(p.price),
       upperBand: Number(p.upper),
       lowerBand: Number(p.lower),
-      confidenceBand: [Number(p.lower), Number(p.upper)] as [number, number], // shading band
+      confidenceBand: [Number(p.lower), Number(p.upper)] as [number, number],
       isPrediction: true,
     }));
 
@@ -228,9 +229,18 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       hist[hist.length - 1].forecast = hist[hist.length - 1].price;
     }
 
+    const allData = [...hist, ...pred];
+
+    // Generate evenly spaced X-axis ticks (show ~25 dates)
+    const tickInterval = Math.ceil(allData.length / 25);
+    const ticks = allData
+      .filter((_, i) => i % tickInterval === 0)
+      .map((d) => d.date);
+
     return {
-      chartData: [...hist, ...pred],
+      chartData: allData,
       predictionStartDate: pred.length > 0 ? pred[0].date : null,
+      xAxisTicks: ticks,
     };
   }, [history, forecast]);
 
@@ -315,8 +325,11 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
       {/* PRICE CHART */}
       <div className="h-96">
-        <ResponsiveContainer>
-          <ComposedChart data={chartData}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart
+            data={chartData}
+            margin={{ top: 10, right: 20, bottom: 10, left: 10 }}
+          >
             <defs>
               <linearGradient id="colorConfidence" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#22c55e" stopOpacity={0.35} />
@@ -327,6 +340,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
             <XAxis
               dataKey="date"
+              ticks={xAxisTicks}
               tick={{ fill: "#64748b", fontSize: 11 }}
               tickFormatter={(value) => {
                 const date = new Date(value);
@@ -336,6 +350,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
             <YAxis
               tick={{ fill: "#64748b", fontSize: 11 }}
               domain={["auto", "auto"]}
+              tickCount={6}
             />
             <Tooltip content={<CustomTooltip />} />
 
@@ -382,7 +397,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
                 stroke="#ef4444"
                 strokeWidth={2}
                 strokeDasharray="3 3"
-                dot={{ fill: "#ef4444", r: 3 }}
+                dot={{ fill: "#ef4444", r: 2 }}
                 connectNulls
               />
             )}
@@ -394,7 +409,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
                 stroke="#10b981"
                 strokeWidth={2}
                 strokeDasharray="3 3"
-                dot={{ fill: "#10b981", r: 3 }}
+                dot={{ fill: "#10b981", r: 2 }}
                 connectNulls
               />
             )}
@@ -403,19 +418,24 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               type="monotone"
               dataKey="forecast"
               stroke="#22d3ee"
-              strokeWidth={3}
+              strokeWidth={2.5}
               strokeDasharray="5 5"
-              dot={{ fill: "#22d3ee", r: 5, strokeWidth: 2, stroke: "#164e63" }}
+              dot={{
+                fill: "#22d3ee",
+                r: 2.5,
+                strokeWidth: 1.5,
+                stroke: "#164e63",
+              }}
               connectNulls
-              activeDot={{ r: 7, strokeWidth: 2, stroke: "#164e63" }}
+              activeDot={{ r: 5, strokeWidth: 2, stroke: "#164e63" }}
             />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
       {/* RSI */}
-      <div className="h-36 space-y-2">
-        <div className="flex items-center justify-between">
+      <div className="h-40 space-y-2 pt-4">
+        <div className="flex items-center justify-between px-2">
           <Label className="text-xs font-mono text-slate-400">
             RSI (0–100)
           </Label>
@@ -435,14 +455,30 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
           </div>
         </div>
 
-        <ResponsiveContainer>
-          <ComposedChart data={chartData}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart
+            data={chartData}
+            margin={{ top: 5, right: 20, bottom: 5, left: 10 }}
+          >
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="#1e293b"
               vertical={false}
             />
-            <YAxis domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 11 }} />
+            <XAxis
+              dataKey="date"
+              ticks={xAxisTicks}
+              tick={{ fill: "#64748b", fontSize: 10 }}
+              tickFormatter={(value) => {
+                const date = new Date(value);
+                return `${date.getMonth() + 1}/${date.getDate()}`;
+              }}
+            />
+            <YAxis
+              domain={[0, 100]}
+              tick={{ fill: "#64748b", fontSize: 11 }}
+              tickCount={5}
+            />
             <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" />
             <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="3 3" />
             <Line
@@ -456,8 +492,8 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       </div>
 
       {/* MACD */}
-      <div className="h-36 space-y-2">
-        <div className="flex items-center justify-between">
+      <div className="h-40 space-y-2 pt-4">
+        <div className="flex items-center justify-between px-2">
           <Label className="text-xs font-mono text-slate-400">MACD</Label>
           <div className="flex items-center gap-4 text-[11px] font-mono text-slate-500">
             <div className="flex items-center gap-1">
@@ -471,14 +507,26 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
           </div>
         </div>
 
-        <ResponsiveContainer>
-          <ComposedChart data={chartData}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart
+            data={chartData}
+            margin={{ top: 5, right: 20, bottom: 5, left: 10 }}
+          >
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="#1e293b"
               vertical={false}
             />
-            <YAxis tick={{ fill: "#64748b", fontSize: 11 }} />
+            <XAxis
+              dataKey="date"
+              ticks={xAxisTicks}
+              tick={{ fill: "#64748b", fontSize: 10 }}
+              tickFormatter={(value) => {
+                const date = new Date(value);
+                return `${date.getMonth() + 1}/${date.getDate()}`;
+              }}
+            />
+            <YAxis tick={{ fill: "#64748b", fontSize: 11 }} tickCount={5} />
             <ReferenceLine y={0} stroke="#64748b" />
             <Line
               dataKey="macd"
