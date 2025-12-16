@@ -112,10 +112,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
   // Custom sort order
   const sortOrder: Record<string, number> = {
-    price: 0, // Historical price first
-    forecast: 1, // Forecast second
-    upperBand: 2, // Upper bound third
-    lowerBand: 3, // Lower bound fourth
+    price: 0,
+    forecast: 1,
+    upperBand: 2,
+    lowerBand: 3,
   };
 
   const sortedPayload = uniquePayload.sort((a: any, b: any) => {
@@ -131,7 +131,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         let displayLabel = entry.name;
         let color = entry.color;
 
-        // Customize labels for clarity
         if (entry.dataKey === "upperBand") {
           displayLabel = "Upper Bound";
           color = "#10b981";
@@ -215,9 +214,9 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
     };
   }, [ticker, forecastDays]);
 
-  const { chartData, predictionStartDate, xAxisTicks } = useMemo(() => {
+  const { chartData, predictionStartDate, tickInterval } = useMemo(() => {
     if (!history.length)
-      return { chartData: [], predictionStartDate: null, xAxisTicks: [] };
+      return { chartData: [], predictionStartDate: null, tickInterval: 0 };
 
     const prices = history.map((p) => p.price);
     const rsi = computeRSI(prices);
@@ -246,16 +245,13 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
     const allData = [...hist, ...pred];
 
-    // Generate evenly spaced X-axis ticks (~25 dates)
-    const tickInterval = Math.ceil(allData.length / 25);
-    const ticks = allData
-      .filter((_, i) => i % tickInterval === 0)
-      .map((d) => d.date);
+    // Calculate interval to show ~25 evenly spaced dates
+    const interval = Math.ceil(allData.length / 25);
 
     return {
       chartData: allData,
       predictionStartDate: pred.length > 0 ? pred[0].date : null,
-      xAxisTicks: ticks,
+      tickInterval: interval - 1, // Recharts interval is 0-indexed
     };
   }, [history, forecast]);
 
@@ -352,11 +348,16 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               </linearGradient>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+            {/* Grid synced with X-axis ticks */}
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#1e293b"
+              syncWithTicks={true}
+            />
 
             <XAxis
               dataKey="date"
-              ticks={xAxisTicks}
+              interval={tickInterval}
               tick={{ fill: "#64748b", fontSize: 11 }}
               tickFormatter={(value) => {
                 const date = new Date(value);
