@@ -233,14 +233,13 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
 
     const pred: ChartPoint[] = forecast.map((p) => ({
       date: p.date,
-      forecast: Number(p.price), // Backend's "price" field = predicted price
+      forecast: Number(p.price),
       upperBand: Number(p.upper),
       lowerBand: Number(p.lower),
       confidenceBand: [Number(p.lower), Number(p.upper)] as [number, number],
       isPrediction: true,
     }));
 
-    // Connect historical to forecast by adding forecast value to last historical point
     if (hist.length > 0 && pred.length > 0) {
       hist[hist.length - 1].forecast = hist[hist.length - 1].price;
     }
@@ -353,14 +352,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               </linearGradient>
             </defs>
 
-            {/* Grid aligned with axis ticks */}
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#1e293b"
-              verticalPoints={xAxisTicks.map((tick) =>
-                chartData.findIndex((d) => d.date === tick)
-              )}
-            />
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
 
             <XAxis
               dataKey="date"
@@ -394,7 +386,6 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
               />
             )}
 
-            {/* Shaded confidence band strictly between lowerBand and upperBand */}
             {showBands && (
               <Area
                 type="monotone"
@@ -507,7 +498,7 @@ export function PriceChart({ ticker, onForecastChange }: PriceChartProps) {
       </div>
 
       {/* MACD */}
-      <div className="h-40 space-y-2 pt-4">
+      <div className="h-40 space-y-2 pt-4 pb-6">
         <div className="flex items-center justify-between px-2">
           <Label className="text-xs font-mono text-slate-400">MACD</Label>
           <div className="flex items-center gap-4 text-[11px] font-mono text-slate-500">
